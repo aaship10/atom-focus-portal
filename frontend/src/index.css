@@ -10,3 +10,19 @@
     @apply bg-[#F0F0F3] text-on-surface font-body-md min-h-screen text-body-md;
   }
 }
+
+@layer components {
+  .neumorphic-outset {
+    box-shadow: -6px -6px 12px #FFFFFF, 6px 6px 12px #AEAEC0;
+  }
+  .neumorphic-inset {
+    box-shadow: inset -2px -2px 5px #FFFFFF, inset 3px 3px 7px #AEAEC0;
+  }
+  .neumorphic-button {
+    @apply transition-all duration-200;
+  }
+  .neumorphic-button:active {
+    box-shadow: inset -2px -2px 5px #FFFFFF, inset 3px 3px 7px #AEAEC0;
+    @apply scale-[0.98];
+  }
+}

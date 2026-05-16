@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from database import engine, Base
-from routers import auth, test
+from routers import auth, test, goals
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth.router)
 app.include_router(test.router)
+app.include_router(goals.router)
 
 @app.get("/")
 async def root():

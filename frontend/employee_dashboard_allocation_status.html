@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FocusPortal - Employee Goals</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#8a9a86",
+                        "on-primary-fixed": "#111f11",
+                        "tertiary": "#73575e",
+                        "on-primary-fixed-variant": "#3c4b3a",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#5d5e61",
+                        "surface-dim": "#d4dbdd",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#2a161c",
+                        "surface-tint": "#536251",
+                        "background": "#f4fafd",
+                        "surface": "#f4fafd",
+                        "outline": "#747871",
+                        "surface-container-low": "#eef5f7",
+                        "surface-container": "#e8eff1",
+                        "primary-fixed-dim": "#bbcbb6",
+                        "on-primary-container": "#243222",
+                        "surface-bright": "#f4fafd",
+                        "secondary-container": "#dfdfe2",
+                        "tertiary-fixed-dim": "#e1bec6",
+                        "secondary-fixed-dim": "#c6c6c9",
+                        "on-tertiary-fixed-variant": "#594047",
+                        "surface-container-highest": "#dde4e6",
+                        "outline-variant": "#c4c8bf",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#444842",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "primary-fixed": "#d7e7d1",
+                        "surface-variant": "#dde4e6",
+                        "tertiary-fixed": "#fed9e2",
+                        "primary": "#536251",
+                        "on-surface": "#161d1f",
+                        "tertiary-container": "#ad8d95",
+                        "surface-container-high": "#e2e9ec",
+                        "on-background": "#161d1f",
+                        "inverse-surface": "#2b3234",
+                        "on-tertiary-container": "#3e272e",
+                        "on-secondary-container": "#616365",
+                        "secondary-fixed": "#e2e2e5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#1a1c1e",
+                        "inverse-primary": "#bbcbb6",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#ebf2f4",
+                        "on-secondary-fixed-variant": "#454749"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "24px",
+                        "base": "8px",
+                        "container-padding": "24px",
+                        "gutter": "20px",
+                        "stack-sm": "12px",
+                        "stack-lg": "48px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Manrope"],
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[style*="'FILL' 1"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface text-primary dark:text-inverse-primary font-headline-md text-headline-md w-full h-20 flex items-center shadow-[6px_6px_12px_#AEAEC0] fixed top-0 right-0 left-0 lg:left-64 z-30 px-gutter flex justify-between items-center">
+<div class="flex items-center gap-4 lg:hidden">
+<span class="material-symbols-outlined text-primary text-2xl">menu</span>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">FocusPortal</span>
+</div>
+<div class="hidden lg:flex items-center gap-4 w-full max-w-md shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] rounded-full px-4 py-2">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input class="bg-transparent border-none focus:ring-0 w-full text-body-md font-body-md text-on-surface-variant outline-none" placeholder="Search..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-all duration-200">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-all duration-200">help_outline</span>
+<div class="w-10 h-10 rounded-full shadow-[-2px_-2px_5px_#FFFFFF] shadow-[2px_2px_5px_#AEAEC0] overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a business user in a modern office setting, bright natural lighting, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq5rQY0gEB6zn5Qx_H17VkSRhA0kB7TTV6lavkxAmQxfgxM-Op-fesiFIgEkRSzNv82blC6n74SGeKLRMcTtAaMJ3XDMN42asKOA5X49qegkhM_gpVcF1zHuft2D0DpbZM_Zwnvkh0dsIFufK92rBJ8Ip0Eb9QwrIF4lzqVVv4jwLgGxxQfu16n1fpomSls5xx_95qllP4YnN3NAaPvlXTXWqL7mvbjqNbbe2ONCA9DyWzN1dFuybgYgVb--qQlarXzzovUf_7Y7o"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-surface dark:bg-surface h-screen w-64 flex-col hidden lg:flex fixed left-0 top-0 h-full z-40 p-container-padding shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0]">
+<div class="mb-stack-lg flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl shadow-[-2px_-2px_5px_#FFFFFF] shadow-[2px_2px_5px_#AEAEC0] flex items-center justify-center bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined font-bold">radar</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">FocusPortal</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant">Strategic Tracking</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="text-on-surface-variant hover:text-primary transition-all duration-200 px-4 py-3 mx-2 flex items-center gap-3 rounded-lg hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0]" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] text-primary font-bold rounded-lg px-4 py-3 mx-2 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">track_changes</span>
+<span class="font-body-md text-body-md">My Goals</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-all duration-200 px-4 py-3 mx-2 flex items-center gap-3 rounded-lg hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0]" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-body-md">Team</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-all duration-200 px-4 py-3 mx-2 flex items-center gap-3 rounded-lg hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0]" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Analytics</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2 pt-4 border-t border-surface-container-highest">
+<a class="text-on-surface-variant hover:text-primary transition-all duration-200 px-4 py-3 mx-2 flex items-center gap-3 rounded-lg hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0]" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-all duration-200 px-4 py-3 mx-2 flex items-center gap-3 rounded-lg hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0]" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-md text-body-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="pt-24 pb-20 lg:pb-8 lg:ml-64 min-h-screen p-container-padding max-w-[1140px] mx-auto">
+<!-- Header -->
+<div class="mb-stack-md">
+<h2 class="font-headline-lg text-headline-lg font-bold text-on-surface">Phase 2 Goals</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2">Manage your current objectives and weight allocation.</p>
+</div>
+<!-- Allocation Widget (Neumorphic Outset) -->
+<section class="bg-surface rounded-[16px] shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] p-6 mb-stack-lg">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+<div>
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface mb-2">Weight Allocation Status</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Distribute 100% across your active goals to submit for approval.</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative w-24 h-24 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] flex items-center justify-center bg-surface">
+<!-- Simulated SVG Progress Ring -->
+<div class="absolute inset-2 rounded-full border-4 border-surface-container-highest"></div>
+<div class="absolute inset-2 rounded-full border-4 border-primary border-t-transparent border-l-transparent border-r-transparent transform rotate-[-45deg]"></div>
+<div class="absolute inset-2 rounded-full border-4 border-primary border-t-transparent border-l-transparent border-b-transparent transform rotate-45deg"></div>
+<span class="font-headline-md text-headline-md font-bold text-primary z-10">85%</span>
+</div>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-3 p-4 rounded-lg shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] bg-surface">
+<span class="material-symbols-outlined text-tertiary">warning</span>
+<p class="font-body-md text-body-md text-on-surface">Current Allocation: <span class="font-bold">85%</span>. You need <span class="text-tertiary font-bold">15%</span> more to reach 100%.</p>
+</div>
+</section>
+<!-- Goals Grid (Bento style) -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Goal Card 1 -->
+<div class="bg-surface rounded-[16px] shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] p-6 flex flex-col h-full hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0] transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="w-10 h-10 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] flex items-center justify-center bg-surface text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] text-primary">25%</span>
+</div>
+<h4 class="font-headline-md text-headline-md font-bold text-on-surface mb-1">Increase Q3 Revenue</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Thrust Area: <span class="font-bold text-on-surface">Sales</span></p>
+<div class="mt-auto">
+<div class="flex justify-between text-body-md font-body-md mb-2">
+<span class="text-on-surface-variant">Target</span>
+<span class="font-bold text-on-surface">$1.2M</span>
+</div>
+<div class="h-3 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] bg-surface overflow-hidden">
+<div class="h-full bg-primary-container shadow-[-2px_-2px_5px_#FFFFFF] shadow-[2px_2px_5px_#AEAEC0] w-1/3 rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Goal Card 2 -->
+<div class="bg-surface rounded-[16px] shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] p-6 flex flex-col h-full hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0] transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="w-10 h-10 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] flex items-center justify-center bg-surface text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group_add</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] text-primary">40%</span>
+</div>
+<h4 class="font-headline-md text-headline-md font-bold text-on-surface mb-1">Hire 5 Sr. Engineers</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Thrust Area: <span class="font-bold text-on-surface">Recruitment</span></p>
+<div class="mt-auto">
+<div class="flex justify-between text-body-md font-body-md mb-2">
+<span class="text-on-surface-variant">Target</span>
+<span class="font-bold text-on-surface">5 Hires</span>
+</div>
+<div class="h-3 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] bg-surface overflow-hidden">
+<div class="h-full bg-primary-container shadow-[-2px_-2px_5px_#FFFFFF] shadow-[2px_2px_5px_#AEAEC0] w-3/5 rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Goal Card 3 -->
+<div class="bg-surface rounded-[16px] shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] p-6 flex flex-col h-full hover:shadow-[-2px_-2px_5px_#FFFFFF] hover:shadow-[2px_2px_5px_#AEAEC0] transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="w-10 h-10 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] flex items-center justify-center bg-surface text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] text-primary">20%</span>
+</div>
+<h4 class="font-headline-md text-headline-md font-bold text-on-surface mb-1">Launch v2.0 Platform</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Thrust Area: <span class="font-bold text-on-surface">Product</span></p>
+<div class="mt-auto">
+<div class="flex justify-between text-body-md font-body-md mb-2">
+<span class="text-on-surface-variant">Target</span>
+<span class="font-bold text-on-surface">Oct 15</span>
+</div>
+<div class="h-3 rounded-full shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] bg-surface overflow-hidden">
+<div class="h-full bg-primary-container shadow-[-2px_-2px_5px_#FFFFFF] shadow-[2px_2px_5px_#AEAEC0] w-[85%] rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Add Goal Placeholder -->
+<div class="bg-surface rounded-[16px] shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] p-6 flex flex-col items-center justify-center h-full min-h-[240px] cursor-pointer hover:bg-surface-container-low transition-colors duration-200 border-2 border-dashed border-outline-variant">
+<div class="w-12 h-12 rounded-full shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] flex items-center justify-center bg-primary text-on-primary mb-4">
+<span class="material-symbols-outlined font-bold">add</span>
+</div>
+<h4 class="font-headline-md text-headline-md font-bold text-on-surface">Add New Goal</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Allocate remaining 15%</p>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-surface dark:bg-surface text-primary dark:text-inverse-primary font-label-caps text-label-caps lg:hidden docked full-width bottom-0 shadow-[-6px_-6px_12px_#FFFFFF] shadow-[6px_6px_12px_#AEAEC0] fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 border-t-0">
+<a class="text-on-surface-variant p-2 flex flex-col items-center gap-1 active:shadow-inner scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="shadow-[inset_-2px_-2px_5px_#FFFFFF] shadow-[inset_3px_3px_7px_#AEAEC0] text-primary rounded-xl p-2 flex flex-col items-center gap-1 active:shadow-inner scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">track_changes</span>
+<span>Goals</span>
+</a>
+<a class="text-on-surface-variant p-2 flex flex-col items-center gap-1 active:shadow-inner scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Team</span>
+</a>
+<a class="text-on-surface-variant p-2 flex flex-col items-center gap-1 active:shadow-inner scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span>Analytics</span>
+</a>
+</nav>
+</body></html>
