@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiClient } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
-import { Check, Target, Info, AlertCircle, Trash2 } from 'lucide-react';
+import { createGoal } from '../../api/goals';
+import { Check, Info } from 'lucide-react';
 
 export default function GoalCreation() {
   const [formData, setFormData] = useState({
@@ -10,24 +10,45 @@ export default function GoalCreation() {
     thrust_area_id: '',
     uom: 'Min',
     target: '',
-    weight: ''
+    weight: '',
+    year: new Date().getFullYear()
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Helper to parse JWT and get user ID
+  const getUserId = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.id; // Corrected from payload.sub to match backend security.py
+    } catch (e) {
+      return null;
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    const userId = getUserId();
+    if (!userId) {
+      alert("Session expired. Please login again.");
+      navigate('/login');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { response } = await apiClient('/goals', {
-        method: 'POST',
-        body: JSON.stringify(formData)
+      await createGoal({
+        ...formData,
+        owner_id: userId,
+        target: parseFloat(formData.target),
+        weight: parseInt(formData.weight)
       });
-      if (response.ok) {
-        navigate('/employee/dashboard');
-      }
+      navigate('/employee/goals/my-goals');
     } catch (error) {
       console.error('Failed to save goal:', error);
+      alert(error.response?.data?.detail || 'Failed to save goal. Please check weights and totals.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +99,7 @@ export default function GoalCreation() {
             </div>
           </div>
 
-          {/* Description - Full Width */}
+          {/* Description */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Goal Description</label>
             <textarea 
@@ -89,7 +110,7 @@ export default function GoalCreation() {
             />
           </div>
 
-          {/* Metrics Row - 3 Columns */}
+          {/* Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Unit of Measurement</label>
@@ -135,6 +156,17 @@ export default function GoalCreation() {
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary font-bold">%</span>
               </div>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Year</label>
+              <input 
+                type="number"
+                className="w-full bg-surface p-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary transition-all font-bold text-on-surface"
+                value={formData.year}
+                onChange={(e) => setFormData({...formData, year: parseInt(e.target.value)})}
+                required
+              />
+            </div>
           </div>
 
           {/* Allocation Bar */}
@@ -151,16 +183,6 @@ export default function GoalCreation() {
                 className="h-full bg-primary rounded-full shadow-[2px_0_4px_rgba(var(--primary-rgb),0.3)] transition-all duration-700"
                 style={{ width: `${Math.min(formData.weight || 0, 100)}%` }}
               ></div>
-            </div>
-            <div className="flex justify-between mt-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Assigned</span>
-                <span className="text-lg font-black text-primary">{formData.weight || 0}%</span>
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Remaining</span>
-                <span className="text-lg font-black text-secondary">{100 - (formData.weight || 0)}%</span>
-              </div>
             </div>
           </div>
 

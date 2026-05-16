@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from database import engine, Base
-from routers import auth, test, goals
+from routers import auth, test, goals, dashboard
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     # Shutdown event
     pass
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Focus Portal API", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(test.router)
 app.include_router(goals.router)
+app.include_router(dashboard.router)
 
 @app.get("/")
 async def root():

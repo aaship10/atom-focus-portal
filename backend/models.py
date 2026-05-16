@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Text
 from sqlalchemy.orm import relationship
 from database import Base
 import datetime
@@ -18,7 +18,8 @@ class User(Base):
     role_id = Column(Integer, ForeignKey("Role.id"), nullable=True)
     
     role = relationship("Role", back_populates="users")
-    goals = relationship("Goal", back_populates="employee")
+    goals = relationship("Goal", back_populates="owner")
+    checkins = relationship("GoalCheckin", back_populates="manager")
 
 class ThrustArea(Base):
     __tablename__ = "ThrustArea"
@@ -31,13 +32,44 @@ class ThrustArea(Base):
 class Goal(Base):
     __tablename__ = "Goal"
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String)
+    owner_id = Column(Integer, ForeignKey("User.id"), nullable=False)
+    thrust_area_id = Column(Integer, ForeignKey("ThrustArea.id"), nullable=False)
+    title = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    weight = Column(Integer)
+    target = Column(Numeric(15, 2), nullable=False)
+    weight = Column(Integer, nullable=False)
+    uom = Column(String(50), nullable=False)
+    year = Column(Integer, nullable=False, default=lambda: datetime.datetime.utcnow().year)
+    status = Column(String(50), default="Pending")
+    locked = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    employee_id = Column(Integer, ForeignKey("User.id"))
-    thrust_area_id = Column(Integer, ForeignKey("ThrustArea.id"))
-    
-    employee = relationship("User", back_populates="goals")
+    owner = relationship("User", back_populates="goals")
     thrust_area = relationship("ThrustArea", back_populates="goals")
+    achievements = relationship("GoalAchievement", back_populates="goal", cascade="all, delete-orphan")
+    checkins = relationship("GoalCheckin", back_populates="goal", cascade="all, delete-orphan")
+
+class GoalAchievement(Base):
+    __tablename__ = "GoalAchievement"
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, ForeignKey("Goal.id"), nullable=False)
+    quarter = Column(String(10), nullable=False)
+    actual_value = Column(Numeric(15, 2), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    goal = relationship("Goal", back_populates="achievements")
+
+class GoalCheckin(Base):
+    __tablename__ = "GoalCheckin"
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, ForeignKey("Goal.id"), nullable=False)
+    manager_id = Column(Integer, ForeignKey("User.id"), nullable=False)
+    checkin_date = Column(DateTime, default=datetime.datetime.utcnow)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    goal = relationship("Goal", back_populates="checkins")
+    manager = relationship("User", back_populates="checkins")
