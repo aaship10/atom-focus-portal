@@ -57,7 +57,7 @@ async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
         )
         
     access_token = create_access_token(
-        data={"id": user.id, "role": user.role.name if user.role else "Employee"}
+        data={"id": user.id, "role": user.role.name if user.role else "Employee", "name": user.name}
     )
     
     print(f"🔓 USER SUCCESSFUL LOGIN: {user.email}")

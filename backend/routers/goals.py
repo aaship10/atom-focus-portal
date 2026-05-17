@@ -28,7 +28,8 @@ async def create_goal(
         uom=goal_in.uom,
         target=goal_in.target,
         weight=goal_in.weight,
-        year=goal_in.year
+        year=goal_in.year,
+        status="Pending" if goal_in.submit_now else "Draft"
     )
     
     db.add(new_goal)
@@ -39,7 +40,7 @@ async def create_goal(
         # Reload with relationships for response
         result = await db.execute(
             select(Goal)
-            .options(joinedload(Goal.thrust_area), joinedload(Goal.achievements))
+            .options(joinedload(Goal.thrust_area), joinedload(Goal.achievements), joinedload(Goal.checkins))
             .where(Goal.id == new_goal.id)
         )
         return result.unique().scalar_one()
@@ -56,7 +57,8 @@ async def get_goals(
 ):
     query = select(Goal).options(
         joinedload(Goal.thrust_area), 
-        joinedload(Goal.achievements)
+        joinedload(Goal.achievements),
+        joinedload(Goal.checkins)
     )
     
     if owner_id:
@@ -111,6 +113,29 @@ async def log_achievement(
     try:
         await db.commit()
         return {"success": True, "message": "Achievement updated successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{goal_id}/submit")
+async def submit_goal(
+    goal_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Goal).where(Goal.id == goal_id, Goal.owner_id == current_user["id"])
+    )
+    goal = result.scalar_one_or_none()
+    
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found or unauthorized")
+    
+    goal.status = 'Pending'
+    
+    try:
+        await db.commit()
+        return {"success": True, "message": "Goal submitted for approval"}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

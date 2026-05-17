@@ -13,6 +13,7 @@ export default function GoalCreation() {
     weight: '',
     year: new Date().getFullYear()
   });
+  const [submitNow, setSubmitNow] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -43,7 +44,8 @@ export default function GoalCreation() {
         ...formData,
         owner_id: userId,
         target: parseFloat(formData.target),
-        weight: parseInt(formData.weight)
+        weight: parseInt(formData.weight),
+        submit_now: submitNow
       });
       navigate('/employee/goals/my-goals');
     } catch (error) {
@@ -191,16 +193,29 @@ export default function GoalCreation() {
             <button 
               type="button"
               onClick={() => navigate('/employee/dashboard')}
-              className="px-8 py-3 rounded-xl font-bold text-secondary hover:text-primary transition-all"
+              className="px-8 py-3 rounded-xl font-bold text-secondary hover:text-primary transition-all text-sm"
             >
               Cancel
             </button>
+            
+            {/* Save as Draft */}
             <button 
               type="submit"
               disabled={loading}
-              className="px-10 py-3 rounded-xl bg-primary text-on-primary font-bold shadow-lg flex items-center gap-2 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+              onClick={() => setSubmitNow(false)}
+              className="px-6 py-3 rounded-xl bg-surface border border-surface-dim hover:border-primary text-secondary hover:text-primary font-bold neumorphic-outset transition-all disabled:opacity-50 text-sm"
             >
-              <span>{loading ? 'Saving...' : 'Save Goal'}</span>
+              Save as Draft
+            </button>
+            
+            {/* Submit for Approval */}
+            <button 
+              type="submit"
+              disabled={loading}
+              onClick={() => setSubmitNow(true)}
+              className="px-8 py-3 rounded-xl bg-primary text-on-primary font-bold shadow-lg flex items-center gap-2 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 text-sm"
+            >
+              <span>{loading ? 'Submitting...' : 'Submit for Approval'}</span>
               {!loading && <Check size={20} />}
             </button>
           </div>

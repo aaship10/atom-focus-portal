@@ -16,8 +16,10 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password_hash = Column(String)
     role_id = Column(Integer, ForeignKey("Role.id"), nullable=True)
+    manager_id = Column(Integer, ForeignKey("User.id"), nullable=True)
     
     role = relationship("Role", back_populates="users")
+    manager = relationship("User", remote_side=[id], backref="direct_reports")
     goals = relationship("Goal", back_populates="owner")
     checkins = relationship("GoalCheckin", back_populates="manager")
 
@@ -66,6 +68,7 @@ class GoalCheckin(Base):
     id = Column(Integer, primary_key=True, index=True)
     goal_id = Column(Integer, ForeignKey("Goal.id"), nullable=False)
     manager_id = Column(Integer, ForeignKey("User.id"), nullable=False)
+    quarter = Column(String(10), nullable=False)
     checkin_date = Column(DateTime, default=datetime.datetime.utcnow)
     comment = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

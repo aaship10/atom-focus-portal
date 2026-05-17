@@ -10,9 +10,10 @@ import MyGoals from './pages/employee/MyGoals';
 import EmployeeQuarterlyCheckIn from './pages/employee/QuarterlyCheckIn';
 
 // Manager Pages
-import ManagerDashboard from './pages/manager/Dashboard';
+import ManagerExperience from './pages/manager/ManagerExperience';
 import TeamList from './pages/manager/TeamList';
 import GoalReview from './pages/manager/GoalReview';
+import SharedGoals from './pages/manager/SharedGoals';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -89,8 +90,11 @@ function App() {
           <Route path="/employee/check-ins" element={<EmployeeQuarterlyCheckIn />} />
 
           {/* Manager Routes */}
-          <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+          <Route path="/manager/dashboard" element={<ManagerExperience defaultTab="dashboard" />} />
+          <Route path="/manager/approvals" element={<ManagerExperience defaultTab="approvals" />} />
+          <Route path="/manager/check-ins" element={<ManagerExperience defaultTab="checkins" />} />
           <Route path="/manager/team" element={<TeamList />} />
+          <Route path="/manager/shared" element={<SharedGoals />} />
           <Route path="/manager/goals/review/:employeeId" element={<GoalReview />} />
 
           {/* Admin Routes */}

@@ -12,11 +12,15 @@ import {
   Calendar
 } from 'lucide-react';
 import { getEmployeeDashboard } from '../../api/dashboard';
+import { submitGoal } from '../../api/goals';
+import { CheckCircle } from 'lucide-react';
 
 export default function EmployeeDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [processingGoalId, setProcessingGoalId] = useState(null);
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState('');
   const navigate = useNavigate();
 
   const today = new Date().toLocaleDateString('en-US', { 
@@ -51,6 +55,24 @@ export default function EmployeeDashboard() {
   };
 
   const quarterInfo = getCurrentQuarterInfo();
+
+  const handleSubmitGoal = async (goalId) => {
+    setProcessingGoalId(goalId);
+    try {
+      await submitGoal(goalId);
+      setData(prev => ({
+        ...prev,
+        top_goals: prev.top_goals.map(g => g.id === goalId ? { ...g, status: 'Pending' } : g),
+        pending_approvals: prev.pending_approvals + 1
+      }));
+      setSuccessMsg("Goal submitted for approval!");
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error("Submission error:", err);
+    } finally {
+      setProcessingGoalId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -107,6 +129,12 @@ export default function EmployeeDashboard() {
       </header>
 
       {/* Action Banner */}
+      {successMsg && (
+        <div className="bg-success/10 border border-success/20 p-4 rounded-2xl flex items-center gap-3 text-success animate-in fade-in slide-in-from-top-2">
+          <CheckCircle size={20} />
+          <p className="font-bold text-sm">{successMsg}</p>
+        </div>
+      )}
       <div className="bg-primary/5 border border-primary/20 p-5 rounded-3xl flex items-center gap-4 text-primary animate-in slide-in-from-top-4 duration-500">
         <div className="w-12 h-12 bg-primary text-on-primary rounded-2xl flex items-center justify-center shadow-lg animate-bounce">
           <Bell size={24} />
@@ -202,13 +230,27 @@ export default function EmployeeDashboard() {
                   <span className={`w-2 h-2 rounded-full ${
                     goal.status === 'Completed' ? 'bg-success' : 
                     goal.status === 'On Track' ? 'bg-primary' : 
-                    goal.status === 'Off Track' ? 'bg-error' : 'bg-secondary'
+                    goal.status === 'Off Track' ? 'bg-error' : 
+                    goal.status === 'Pending' ? 'bg-amber-500' : 'bg-secondary'
                   }`}></span>
-                  <span className="text-[10px] font-black text-secondary uppercase tracking-widest">{goal.status}</span>
+                  <span className="text-[10px] font-black text-secondary uppercase tracking-widest">
+                    {goal.status === 'Pending' ? 'Pending Approval' : goal.status}
+                  </span>
                 </div>
               </div>
               
-              <div className="w-full md:w-64 space-y-2">
+              <div className="flex items-center gap-6">
+                {(goal.status === 'Draft' || goal.status === 'Rejected' || !goal.status) && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); handleSubmitGoal(goal.id); }}
+                    disabled={processingGoalId === goal.id}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-[10px] font-black uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {processingGoalId === goal.id ? 'Submitting...' : 'Submit for Approval'}
+                  </button>
+                )}
+                
+                <div className="w-full md:w-64 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-black text-secondary uppercase tracking-widest">Progress</span>
                   <span className="text-sm font-black text-on-surface">{goal.progress}%</span>
@@ -225,6 +267,7 @@ export default function EmployeeDashboard() {
               
               <ChevronRight className="text-secondary group-hover:translate-x-1 transition-transform" size={20} />
             </div>
+          </div>
           ))}
         </div>
       </div>

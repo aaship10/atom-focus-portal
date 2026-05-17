@@ -41,3 +41,11 @@ export const logAchievement = async (goalId, data) => {
   
   return result;
 };
+
+export const submitGoal = async (goalId) => {
+  const { response, data: result } = await apiClient(`/goals/${goalId}/submit`, {
+    method: 'PUT'
+  });
+  if (!response.ok) throw new Error('Failed to submit goal');
+  return result;
+};
