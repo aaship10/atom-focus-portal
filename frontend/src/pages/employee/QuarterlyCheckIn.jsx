@@ -23,9 +23,55 @@ export default function EmployeeQuarterlyCheckIn() {
   const [loading, setLoading] = useState(true);
   const [savingGoalId, setSavingGoalId] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [bypassRestrictions, setBypassRestrictions] = useState(false);
 
   const quarters = ["Q1", "Q2", "Q3", "Q4"];
   const years = [2025, 2026, 2027];
+
+  const currentMonth = new Date().getMonth(); // 0-11
+  
+  const getActivePeriod = () => {
+    if (currentMonth === 4 || currentMonth === 5) return 'Phase 1 — Goal Setting';
+    if (currentMonth === 6 || currentMonth === 7 || currentMonth === 8) return 'Q1 Check-in';
+    if (currentMonth === 9 || currentMonth === 10 || currentMonth === 11) return 'Q2 Check-in';
+    if (currentMonth === 0 || currentMonth === 1) return 'Q3 Check-in';
+    if (currentMonth === 2 || currentMonth === 3) return 'Q4 / Annual';
+    return '';
+  };
+
+  const getQuarterWindowStatus = (quarter) => {
+    switch (quarter) {
+      case 'Q1':
+        return {
+          isOpen: currentMonth === 6 || currentMonth === 7 || currentMonth === 8,
+          openMonth: 'July',
+          months: 'July - September'
+        };
+      case 'Q2':
+        return {
+          isOpen: currentMonth === 9 || currentMonth === 10 || currentMonth === 11,
+          openMonth: 'October',
+          months: 'October - December'
+        };
+      case 'Q3':
+        return {
+          isOpen: currentMonth === 0 || currentMonth === 1,
+          openMonth: 'January',
+          months: 'January - February'
+        };
+      case 'Q4':
+        return {
+          isOpen: currentMonth === 2 || currentMonth === 3,
+          openMonth: 'March / April',
+          months: 'March - April'
+        };
+      default:
+        return { isOpen: false, openMonth: '', months: '' };
+    }
+  };
+
+  const windowStatus = getQuarterWindowStatus(selectedQuarter);
+  const isWindowOpen = bypassRestrictions || windowStatus.isOpen;
 
   const getUserId = () => {
     const token = localStorage.getItem('token');
@@ -139,7 +185,7 @@ export default function EmployeeQuarterlyCheckIn() {
         quarter: selectedQuarter,
         actual_value: actualValue,
         status: statusValue
-      });
+      }, bypassRestrictions);
       setMessage({ type: 'success', text: `Updated "${goal.title}" for ${selectedQuarter}` });
       await loadGoals(); // Reload to get fresh data
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -169,12 +215,12 @@ export default function EmployeeQuarterlyCheckIn() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-stack-md">
+    <div className="w-full max-w-6xl mx-auto space-y-8">
       {/* Header with Year Selector */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Quarterly Check-In</h1>
-          <p className="text-secondary font-body-lg text-body-lg">Manage progress and rollovers across the fiscal year.</p>
+          <h1 className="font-headline-lg text-4xl font-black text-on-surface tracking-tight">Quarterly Check-In</h1>
+          <p className="text-secondary font-medium mt-1">Manage progress and rollovers across the fiscal year.</p>
         </div>
         
         <div className="flex items-center gap-4 bg-surface p-2 rounded-2xl shadow-inner border border-white/10">
@@ -188,6 +234,72 @@ export default function EmployeeQuarterlyCheckIn() {
           </select>
         </div>
       </header>
+
+      {/* Check-in Schedule Card */}
+      <div className="bg-surface rounded-3xl p-6 shadow-card border border-white/20 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-black text-on-surface flex items-center gap-2">
+              <Calendar className="text-primary" size={22} />
+              Check-in Window Schedule
+            </h2>
+            <p className="text-secondary text-xs font-medium mt-0.5">Enforced quarterly windows for goal setting and achievement capture.</p>
+          </div>
+          
+          {/* Demo Bypass Switch */}
+          <div className="flex items-center gap-3 bg-surface-dim p-2.5 rounded-xl border border-white/10 shadow-inner">
+            <span className="text-[10px] font-black text-secondary uppercase tracking-wider">Demo Override Mode</span>
+            <button 
+              onClick={() => {
+                setBypassRestrictions(!bypassRestrictions);
+                setMessage({
+                  type: 'success',
+                  text: !bypassRestrictions ? 'Demo Override Mode Enabled: Achievement capture windows bypassed for all quarters.' : 'Demo Override Mode Disabled: Schedule window enforcement active.'
+                });
+                setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+              }}
+              className={`w-12 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${
+                bypassRestrictions ? 'bg-primary' : 'bg-surface-dim shadow-inner border border-white/10'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                bypassRestrictions ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Schedule Timeline */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
+          {[
+            { id: 'Phase 1', label: 'Phase 1 - Goal Setting', window: '1st May', action: 'Creation & Approval', active: currentMonth === 4 || currentMonth === 5 },
+            { id: 'Q1', label: 'Q1 Check-in', window: 'July', action: 'Planned vs. Actual', active: currentMonth === 6 || currentMonth === 7 || currentMonth === 8 },
+            { id: 'Q2', label: 'Q2 Check-in', window: 'October', action: 'Planned vs. Actual', active: currentMonth === 9 || currentMonth === 10 || currentMonth === 11 },
+            { id: 'Q3', label: 'Q3 Check-in', window: 'January', action: 'Planned vs. Actual', active: currentMonth === 0 || currentMonth === 1 },
+            { id: 'Q4', label: 'Q4 / Annual', window: 'March / April', action: 'Final Achievement Capture', active: currentMonth === 2 || currentMonth === 3 }
+          ].map((period) => (
+            <div 
+              key={period.id} 
+              className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-28 ${
+                period.active 
+                  ? 'bg-primary/10 border-primary/40 text-primary shadow-lg ring-1 ring-primary/20' 
+                  : 'bg-surface-dim border-surface-dim text-secondary opacity-70'
+              }`}
+            >
+              <div>
+                <span className={`text-[9px] font-black uppercase tracking-wider block ${period.active ? 'text-primary' : 'text-secondary'}`}>{period.label}</span>
+                <p className="text-xs font-bold text-on-surface mt-1">{period.window}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-semibold opacity-80">{period.action}</p>
+                {period.active && (
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-primary text-[7px] font-black text-on-primary uppercase tracking-widest mt-1.5 animate-pulse">Active</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Quarter Tabs */}
       <div className="flex gap-2 p-1.5 bg-surface rounded-2xl shadow-inner border border-white/5 w-fit">
@@ -215,6 +327,21 @@ export default function EmployeeQuarterlyCheckIn() {
         </div>
       )}
 
+      {!isWindowOpen && (
+        <div className="p-5 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-700 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+          <Info size={22} className="shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-sm font-black uppercase tracking-wider">Achievement Capture Locked</h4>
+            <p className="text-xs font-semibold">
+              The {selectedQuarter} check-in window is currently closed. Enforced window opens in <span className="font-black underline">{windowStatus.openMonth}</span> ({windowStatus.months}).
+            </p>
+            <p className="text-[10px] font-medium opacity-80">
+              You can review saved Q1/Q2/Q3/Q4 achievements, but editing is disabled. Enable <span className="font-bold">Demo Override Mode</span> above to enter test data.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Goals List */}
       <div className="space-y-gutter pb-20">
         {goals.length === 0 ? (
@@ -227,7 +354,7 @@ export default function EmployeeQuarterlyCheckIn() {
           const currentAchievement = getAchievementForQuarter(goal, selectedQuarter);
           const previousAchievement = getLatestAchievementBefore(goal, selectedQuarter);
           const isCompleted = goal.status === 'Completed';
-          const isLocked = isGoalCompletedInPast(goal, selectedQuarter);
+          const isLocked = isGoalCompletedInPast(goal, selectedQuarter) || !isWindowOpen;
           
           const displayActual = goal.tempActual !== undefined ? goal.tempActual : (currentAchievement?.actual_value || '');
           const displayStatus = goal.tempStatus || goal.status;
@@ -245,7 +372,15 @@ export default function EmployeeQuarterlyCheckIn() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-bold text-on-surface leading-tight">{goal.title}</h3>
-                        {isLocked && <span className="px-2 py-0.5 rounded bg-success/10 text-success text-[8px] font-bold uppercase tracking-widest border border-success/20">Rolled Over (Locked)</span>}
+                        {isLocked && (
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border ${
+                            isGoalCompletedInPast(goal, selectedQuarter) 
+                              ? 'bg-success/10 text-success border-success/20' 
+                              : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                          }`}>
+                            {isGoalCompletedInPast(goal, selectedQuarter) ? 'Rolled Over (Locked)' : 'Window Closed (Locked)'}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="px-2 py-0.5 rounded-full bg-surface-variant text-secondary text-[10px] font-bold uppercase tracking-wider border border-surface-dim">UoM: {goal.uom}</span>

@@ -41,11 +41,13 @@ function Layout({ children }) {
 
   const payload = parseJwt(token);
   const role = payload?.role || 'Employee';
+  const name = payload?.name || 'User Name';
 
   return (
     <div className="min-h-screen bg-[#F0F0F3] flex">
       <LeftSidebar 
         role={role} 
+        name={name}
         isCollapsed={isCollapsed} 
         setIsCollapsed={setIsCollapsed} 
       />

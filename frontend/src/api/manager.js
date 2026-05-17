@@ -36,10 +36,11 @@ export const getTeamData = async (year) => {
   return result;
 };
 
-export const submitManagerCheckin = async (goalId, quarter, comment) => {
+export const submitManagerCheckin = async (goalId, quarter, comment, bypass = false) => {
   const { response, data: result } = await apiClient(`/manager/goals/${goalId}/checkins`, {
     method: 'POST',
-    body: JSON.stringify({ quarter, comment })
+    body: JSON.stringify({ quarter, comment }),
+    headers: bypass ? { 'X-Bypass-Restrictions': 'true' } : {}
   });
   if (!response.ok) throw new Error('Failed to submit check-in');
   return result;

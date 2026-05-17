@@ -31,6 +31,13 @@ export default function GoalCreation() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const weightVal = parseInt(formData.weight);
+    if (isNaN(weightVal) || weightVal < 10) {
+      alert("Minimum weight has to be 10%. It cannot be below that.");
+      return;
+    }
+
     const userId = getUserId();
     if (!userId) {
       alert("Session expired. Please login again.");
@@ -149,6 +156,8 @@ export default function GoalCreation() {
               <div className="relative">
                 <input 
                   type="number"
+                  min="10"
+                  max="100"
                   className="w-full bg-surface p-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary transition-all font-bold text-on-surface pr-10"
                   placeholder="10"
                   value={formData.weight}

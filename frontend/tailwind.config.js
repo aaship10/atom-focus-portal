@@ -53,6 +53,8 @@ export default {
         "outline": "#747871",
         "tertiary": "#73575e",
         "primary": "#536251",
+        "success": "#059669",
+        "on-success": "#ffffff",
         "surface-bright": "#f4fafd",
         "secondary-fixed": "#e2e2e5"
       },

@@ -26,3 +26,15 @@
     @apply scale-[0.98];
   }
 }
+
+@layer utilities {
+  .bg-success {
+    background-color: #059669 !important;
+  }
+  .text-success {
+    color: #059669 !important;
+  }
+  .border-success {
+    border-color: #059669 !important;
+  }
+}

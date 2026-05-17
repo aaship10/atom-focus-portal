@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   LayoutDashboard, 
@@ -14,7 +15,8 @@ import {
   Loader2,
   Calendar,
   Save,
-  Filter
+  Filter,
+  Info
 } from 'lucide-react';
 import { getManagerDashboard, getTeamData, getPendingTeamGoals, approveGoal, rejectGoal, submitManagerCheckin } from '../../api/manager';
 
@@ -174,40 +176,43 @@ const TeamGoalApprovalsView = ({ teamData, onApprove, onReject, processingId }) 
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-end gap-4">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-secondary uppercase">Target</label>
+                        <div className="flex flex-wrap items-center lg:items-end gap-4 lg:gap-6 bg-surface-dim/20 p-4 rounded-2xl border border-white/20 shadow-inner">
+                          <div className="flex flex-col gap-1.5 min-w-[100px]">
+                            <label className="text-[10px] font-black text-secondary uppercase tracking-wider block">Target</label>
                             <input 
                               type="number"
                               value={editValues[goal.id]?.target ?? goal.target}
                               onChange={(e) => handleEditChange(goal.id, 'target', e.target.value)}
-                              className="w-24 px-3 py-2 rounded-xl bg-surface-variant border-none focus:ring-2 focus:ring-primary text-sm font-bold"
+                              className="w-28 px-3 py-2.5 rounded-xl bg-surface-variant border border-white/10 focus:ring-2 focus:ring-primary text-sm font-bold focus:outline-none"
                             />
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-secondary uppercase">Weight (%)</label>
+                          
+                          <div className="flex flex-col gap-1.5 min-w-[90px]">
+                            <label className="text-[10px] font-black text-secondary uppercase tracking-wider block">Weight (%)</label>
                             <input 
                               type="number"
                               value={editValues[goal.id]?.weight ?? goal.weight}
                               onChange={(e) => handleEditChange(goal.id, 'weight', e.target.value)}
-                              className="w-20 px-3 py-2 rounded-xl bg-surface-variant border-none focus:ring-2 focus:ring-primary text-sm font-bold"
+                              className="w-24 px-3 py-2.5 rounded-xl bg-surface-variant border border-white/10 focus:ring-2 focus:ring-primary text-sm font-bold focus:outline-none"
                             />
                           </div>
-                          <div className="flex items-center gap-2">
+
+                          <div className="flex items-center gap-3 self-stretch lg:self-auto justify-end flex-1 lg:flex-none">
                             <button 
                               onClick={() => onReject(goal.id)}
                               disabled={processingId === goal.id}
-                              className="p-2.5 rounded-xl border border-error/20 text-error hover:bg-error hover:text-white transition-all disabled:opacity-50"
+                              className="p-3 rounded-xl border border-error/30 text-error hover:bg-error hover:text-white transition-all disabled:opacity-50 shadow-sm flex items-center justify-center hover:scale-105 active:scale-95 duration-150"
+                              title="Reject & return for rework"
                             >
                               <XCircle size={18} />
                             </button>
                             <button 
                               onClick={() => onApprove(goal.id, editValues[goal.id])}
                               disabled={processingId === goal.id}
-                              className="px-6 py-2.5 rounded-xl bg-success text-white text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                              className="px-6 py-3 rounded-xl bg-success text-white text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-2 duration-150"
                             >
                               {processingId === goal.id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                              Approve
+                              <span>Approve</span>
                             </button>
                           </div>
                         </div>
@@ -233,8 +238,38 @@ const TeamGoalApprovalsView = ({ teamData, onApprove, onReject, processingId }) 
 };
 
 // C. ManagerCheckIns Component
-const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quarter, onFilterChange }) => {
+const ManagerCheckInsView = ({ 
+  teamData, 
+  onSaveComment, 
+  processingId, 
+  year, 
+  quarter, 
+  onFilterChange, 
+  bypassRestrictions, 
+  setBypassRestrictions 
+}) => {
   const [comments, setComments] = useState({});
+  const [localMsg, setLocalMsg] = useState({ type: '', text: '' });
+  const currentMonth = new Date().getMonth(); // 0-11
+
+  const getQuarterWindowStatus = (q) => {
+    if (bypassRestrictions) return { isOpen: true };
+
+    const statusMap = {
+      'Q1': { open: currentMonth === 6 || currentMonth === 7 || currentMonth === 8, openMonth: 'July', months: 'July - September' },
+      'Q2': { open: currentMonth === 9 || currentMonth === 10 || currentMonth === 11, openMonth: 'October', months: 'October - December' },
+      'Q3': { open: currentMonth === 0 || currentMonth === 1, openMonth: 'January', months: 'January - February' },
+      'Q4': { open: currentMonth === 2 || currentMonth === 3, openMonth: 'March / April', months: 'March - April' }
+    };
+    return {
+      isOpen: statusMap[q]?.open || false,
+      openMonth: statusMap[q]?.openMonth,
+      months: statusMap[q]?.months
+    };
+  };
+
+  const windowStatus = getQuarterWindowStatus(quarter);
+  const isWindowOpen = windowStatus.isOpen;
 
   useEffect(() => {
     const initialComments = {};
@@ -260,6 +295,7 @@ const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quar
           <h2 className="text-2xl font-black text-on-surface">Quarterly Check-ins</h2>
           <p className="text-secondary text-sm font-medium">Conduct performance discussions and log feedback.</p>
         </div>
+        
         <div className="flex items-center gap-3 bg-surface p-2 rounded-2xl shadow-sm border border-white/20">
           <div className="flex items-center gap-2 px-3">
             <Calendar size={16} className="text-secondary" />
@@ -285,6 +321,96 @@ const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quar
         </div>
       </header>
 
+      {localMsg.text && (
+        <div className={`p-4 rounded-2xl text-xs font-black uppercase tracking-wider text-center border animate-in fade-in duration-300 ${
+          localMsg.type === 'success' ? 'bg-success/10 text-success border-success/20' : 'bg-error/10 text-error border-error/20'
+        }`}>
+          {localMsg.text}
+        </div>
+      )}
+
+      {/* Check-in Schedule Card */}
+      <div className="bg-surface rounded-3xl p-6 shadow-card border border-white/20 space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-lg font-black text-on-surface flex items-center gap-2">
+              <Calendar className="text-primary" size={22} />
+              Check-in Window Schedule
+            </h2>
+            <p className="text-secondary text-xs font-medium mt-0.5">Enforced quarterly windows for manager progress evaluation and feedback.</p>
+          </div>
+          
+          {/* Demo Bypass Switch */}
+          <div className="flex items-center gap-3 bg-surface-dim p-2.5 rounded-xl border border-white/10 shadow-inner">
+            <span className="text-[10px] font-black text-secondary uppercase tracking-wider">Demo Override Mode</span>
+            <button 
+              onClick={() => {
+                const newState = !bypassRestrictions;
+                setBypassRestrictions(newState);
+                setLocalMsg({
+                  type: 'success',
+                  text: newState ? 'Demo Override Mode Enabled: All check-in windows bypassed for testing.' : 'Demo Override Mode Disabled: Enforced windows active.'
+                });
+                setTimeout(() => setLocalMsg({ type: '', text: '' }), 4000);
+              }}
+              className={`w-12 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${
+                bypassRestrictions ? 'bg-primary' : 'bg-surface-dim shadow-inner border border-white/10'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                bypassRestrictions ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Schedule Timeline */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
+          {[
+            { id: 'Phase 1', label: 'Phase 1 - Goal Setting', window: '1st May', action: 'Creation & Approval', active: currentMonth === 4 || currentMonth === 5 },
+            { id: 'Q1', label: 'Q1 Check-in', window: 'July', action: 'Manager Evaluation', active: currentMonth === 6 || currentMonth === 7 || currentMonth === 8 },
+            { id: 'Q2', label: 'Q2 Check-in', window: 'October', action: 'Manager Evaluation', active: currentMonth === 9 || currentMonth === 10 || currentMonth === 11 },
+            { id: 'Q3', label: 'Q3 Check-in', window: 'January', action: 'Manager Evaluation', active: currentMonth === 0 || currentMonth === 1 },
+            { id: 'Q4', label: 'Q4 / Annual', window: 'March / April', action: 'Final Evaluation & Capture', active: currentMonth === 2 || currentMonth === 3 }
+          ].map((period) => (
+            <div 
+              key={period.id} 
+              className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-28 ${
+                period.active 
+                  ? 'bg-primary/10 border-primary/40 text-primary shadow-lg ring-1 ring-primary/20' 
+                  : 'bg-surface border-white/5 opacity-40 hover:opacity-60 text-secondary'
+              }`}
+            >
+              <div className="space-y-1">
+                <span className="text-[9px] font-black uppercase tracking-wider block opacity-75">{period.id}</span>
+                <span className="text-xs font-bold leading-tight block text-on-surface">{period.label}</span>
+              </div>
+              <div className="space-y-0.5">
+                <span className={`text-[9px] font-bold block ${period.active ? 'text-primary' : 'text-secondary'}`}>Opens: {period.window}</span>
+                <span className="text-[8px] font-medium block opacity-80">{period.action}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Closed Warning Banner */}
+      {!isWindowOpen && (
+        <div className="p-5 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-700 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+          <Info size={22} className="shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-sm font-black uppercase tracking-wider">Evaluation Closed</h4>
+            <p className="text-xs font-semibold">
+              The {quarter} feedback window is currently closed. Enforced window opens in <span className="font-black underline">{windowStatus.openMonth}</span> ({windowStatus.months}).
+            </p>
+            <p className="text-[10px] font-medium opacity-80">
+              You can review saved Q1/Q2/Q3/Q4 manager comments, but saving new comments is disabled. Enable <span className="font-bold">Demo Override Mode</span> above to log test feedback.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Team Check-ins List */}
       <div className="space-y-6">
         {teamData.map((member) => (
           <div key={member.id} className="bg-surface rounded-3xl shadow-card border border-white/20 overflow-hidden">
@@ -300,13 +426,20 @@ const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quar
                 <div className="p-8 text-center text-secondary italic text-sm">No goals found for this period.</div>
               ) : member.goals.map((goal) => {
                 const achievement = goal.achievements?.find(a => a.quarter === quarter);
-                const checkin = goal.checkins?.find(c => c.quarter === quarter);
-                
+                const isLocked = !isWindowOpen;
+
                 return (
-                  <div key={goal.id} className="p-6 space-y-4">
+                  <div key={goal.id} className={`p-6 space-y-4 transition-all ${isLocked ? 'opacity-65 grayscale-[0.4]' : ''}`}>
                     <div className="flex flex-col md:flex-row justify-between gap-4">
                       <div className="flex-1">
-                        <h4 className="font-bold text-on-surface">{goal.title}</h4>
+                        <div className="flex items-center justify-between gap-4">
+                          <h4 className="font-bold text-on-surface">{goal.title}</h4>
+                          {isLocked && (
+                            <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                              Window Closed (Locked)
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[10px] font-black text-secondary uppercase bg-surface-variant px-2 py-0.5 rounded-lg">
                             Target: {goal.target} {goal.uom}
@@ -334,19 +467,22 @@ const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quar
                       <textarea 
                         value={comments[goal.id] || ''}
                         onChange={(e) => handleCommentChange(goal.id, e.target.value)}
-                        placeholder="Discuss progress, blockers, and next steps..."
-                        className="w-full min-h-[100px] p-4 rounded-2xl bg-surface-variant border-none focus:ring-2 focus:ring-primary text-sm font-medium resize-none placeholder:text-secondary/50"
+                        disabled={isLocked}
+                        placeholder={isLocked ? "Feedback window is closed. Enable Demo Override Mode to comment." : "Discuss progress, blockers, and next steps..."}
+                        className="w-full min-h-[100px] p-4 rounded-2xl bg-surface-variant border-none focus:ring-2 focus:ring-primary text-sm font-medium resize-none placeholder:text-secondary/50 disabled:opacity-75 disabled:cursor-not-allowed"
                       />
-                      <div className="flex justify-end">
-                        <button 
-                          onClick={() => onSaveComment(goal.id, comments[goal.id])}
-                          disabled={processingId === `${goal.id}-checkin` || !comments[goal.id]}
-                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          {processingId === `${goal.id}-checkin` ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                          Save Feedback
-                        </button>
-                      </div>
+                      {!isLocked && (
+                        <div className="flex justify-end">
+                          <button 
+                            onClick={() => onSaveComment(goal.id, comments[goal.id])}
+                            disabled={processingId === `${goal.id}-checkin` || !comments[goal.id]}
+                            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            {processingId === `${goal.id}-checkin` ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                            Save Feedback
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -362,6 +498,7 @@ const ManagerCheckInsView = ({ teamData, onSaveComment, processingId, year, quar
 // --- Main Component ---
 
 export default function ManagerExperience({ defaultTab = 'dashboard' }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   useEffect(() => {
@@ -376,6 +513,7 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
     year: new Date().getFullYear(),
     quarter: `Q${Math.floor(new Date().getMonth() / 3) + 1}`
   });
+  const [bypassRestrictions, setBypassRestrictions] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -430,7 +568,7 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
   const handleSaveCheckin = async (goalId, comment) => {
     setProcessingId(`${goalId}-checkin`);
     try {
-      await submitManagerCheckin(goalId, filters.quarter, comment);
+      await submitManagerCheckin(goalId, filters.quarter, comment, bypassRestrictions);
       await fetchInitialData();
       console.log("Feedback saved successfully");
     } catch (err) {
@@ -466,7 +604,7 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
           <p className="text-secondary font-medium mt-1">Hello, {stats?.user_name}! You have {stats?.pending_approvals} pending approvals.</p>
         </div>
         
-        <nav className="flex items-center gap-1 bg-surface-dim p-1 rounded-[2rem] shadow-inset border border-white/5">
+        {/* <nav className="flex items-center gap-1 bg-surface-dim p-1 rounded-[2rem] shadow-inset border border-white/5">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'approvals', label: 'Approvals', icon: CheckSquare },
@@ -485,7 +623,7 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
               <span>{tab.label}</span>
             </button>
           ))}
-        </nav>
+        </nav> */}
       </header>
 
       <main>
@@ -493,7 +631,11 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
           <ManagerDashboardView 
             stats={stats} 
             pendingGoals={pendingGoals} 
-            onNavigate={setActiveTab} 
+            onNavigate={(tab) => {
+              if (tab === 'approvals') navigate('/manager/approvals');
+              else if (tab === 'checkins') navigate('/manager/check-ins');
+              else navigate('/manager/dashboard');
+            }} 
           />
         )}
         {activeTab === 'approvals' && (
@@ -512,6 +654,8 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
             year={filters.year}
             quarter={filters.quarter}
             onFilterChange={handleFilterChange}
+            bypassRestrictions={bypassRestrictions}
+            setBypassRestrictions={setBypassRestrictions}
           />
         )}
       </main>

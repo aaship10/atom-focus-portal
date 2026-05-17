@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
+import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -17,8 +18,8 @@ async def create_goal(
     current_user: dict = Depends(get_current_user)
 ):
     # Basic Validation: Ensure weight is reasonable
-    if goal_in.weight <= 0 or goal_in.weight > 100:
-        raise HTTPException(status_code=400, detail="Weight must be between 1 and 100")
+    if goal_in.weight < 10 or goal_in.weight > 100:
+        raise HTTPException(status_code=400, detail="Weight must be between 10 and 100")
 
     new_goal = Goal(
         owner_id=goal_in.owner_id,
@@ -77,8 +78,31 @@ async def log_achievement(
     goal_id: int,
     achievement_in: GoalAchievementCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    x_bypass_restrictions: Optional[bool] = Header(None)
 ):
+    # Enforce quarterly check-in capture windows
+    if not x_bypass_restrictions:
+        current_month = datetime.datetime.now().month  # 1-12
+        valid_months = {
+            'Q1': [7, 8, 9],       # July, August, September
+            'Q2': [10, 11, 12],    # October, November, December
+            'Q3': [1, 2],          # January, February
+            'Q4': [3, 4]           # March, April
+        }
+        q = achievement_in.quarter
+        if q in valid_months and current_month not in valid_months[q]:
+            open_months = {
+                'Q1': 'July (July - September)',
+                'Q2': 'October (October - December)',
+                'Q3': 'January (January - February)',
+                'Q4': 'March / April (March - April)'
+            }
+            raise HTTPException(
+                status_code=400,
+                detail=f"The {q} check-in window is currently closed. It opens in {open_months[q]}."
+            )
+
     # Verify goal exists and user owns it (or is manager/admin - adding basic check)
     result = await db.execute(
         select(Goal)

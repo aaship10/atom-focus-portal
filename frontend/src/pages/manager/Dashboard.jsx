@@ -97,7 +97,7 @@ export default function ManagerDashboard() {
               <AlertCircle size={16} className="text-amber-500" /> Action Required
             </h2>
             <div className="space-y-3">
-              <Link to="/manager/goals/review" className="flex items-center justify-between p-4 bg-surface-variant rounded-2xl group hover:bg-primary/5 transition-all">
+              <Link to="/manager/approvals" className="flex items-center justify-between p-4 bg-surface-variant rounded-2xl group hover:bg-primary/5 transition-all">
                 <div className="flex flex-col">
                   <span className="text-sm font-bold text-on-surface">Goal Approvals</span>
                   <span className="text-[10px] text-secondary font-medium">{pendingGoals.length} goals waiting</span>
@@ -120,7 +120,7 @@ export default function ManagerDashboard() {
             </div>
             <h3 className="text-xl font-black text-on-surface">Pending Approvals</h3>
           </div>
-          <Link to="/manager/goals/review" className="text-sm font-bold text-primary hover:underline">Manage All</Link>
+          <Link to="/manager/approvals" className="text-sm font-bold text-primary hover:underline">Manage All</Link>
         </div>
 
         <div className="divide-y divide-surface-dim">
@@ -162,7 +162,7 @@ export default function ManagerDashboard() {
             </div>
           ))}
           {pendingGoals.length > 5 && (
-            <Link to="/manager/goals/review" className="block p-4 text-center text-xs font-bold text-secondary hover:bg-surface-variant transition-colors italic">
+            <Link to="/manager/approvals" className="block p-4 text-center text-xs font-bold text-secondary hover:bg-surface-variant transition-colors italic">
               + {pendingGoals.length - 5} more pending goals...
             </Link>
           )}

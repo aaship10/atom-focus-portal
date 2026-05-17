@@ -43,7 +43,7 @@ const SidebarLink = ({ to, icon: Icon, children, active, isCollapsed }) => (
   </Link>
 );
 
-const UserSection = ({ role, isCollapsed }) => {
+const UserSection = ({ role, name, isCollapsed }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
@@ -57,7 +57,7 @@ const UserSection = ({ role, isCollapsed }) => {
         </div>
         {!isCollapsed && (
           <div className="flex flex-col min-w-0">
-            <span className="text-xs font-black text-on-surface uppercase tracking-wider truncate">User Name</span>
+            <span className="text-xs font-black text-on-surface uppercase tracking-wider truncate">{name || 'User Name'}</span>
             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full w-fit uppercase">{role}</span>
           </div>
         )}
@@ -74,7 +74,7 @@ const UserSection = ({ role, isCollapsed }) => {
   );
 };
 
-const SidebarContainer = ({ role, links, isCollapsed, setIsCollapsed }) => {
+const SidebarContainer = ({ role, name, links, isCollapsed, setIsCollapsed }) => {
   const location = useLocation();
 
   return (
@@ -120,31 +120,31 @@ const SidebarContainer = ({ role, links, isCollapsed, setIsCollapsed }) => {
       </button>
 
       {/* User Section */}
-      <UserSection role={role} isCollapsed={isCollapsed} />
+      <UserSection role={role} name={name} isCollapsed={isCollapsed} />
     </aside>
   );
 };
 
-export const EmployeeSidebar = ({ isCollapsed, setIsCollapsed }) => {
+export const EmployeeSidebar = ({ name, isCollapsed, setIsCollapsed }) => {
   const links = [
     { to: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/employee/goals/my-goals', label: 'My Goals', icon: Target },
     { to: '/employee/check-ins', label: 'Quarterly Check-Ins', icon: ClipboardCheck },
   ];
-  return <SidebarContainer role="Employee" links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+  return <SidebarContainer role="Employee" name={name} links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
 };
 
-export const ManagerSidebar = ({ isCollapsed, setIsCollapsed }) => {
+export const ManagerSidebar = ({ name, isCollapsed, setIsCollapsed }) => {
   const links = [
     { to: '/manager/dashboard', label: 'Team Dashboard', icon: Users },
     { to: '/manager/approvals', label: 'Goal Approvals', icon: CheckCircle2 },
     { to: '/manager/check-ins', label: 'Team Check-Ins', icon: MessageSquare },
     { to: '/manager/shared', label: 'Shared Goals', icon: Share2 },
   ];
-  return <SidebarContainer role="Manager" links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+  return <SidebarContainer role="Manager" name={name} links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
 };
 
-export const AdminSidebar = ({ isCollapsed, setIsCollapsed }) => {
+export const AdminSidebar = ({ name, isCollapsed, setIsCollapsed }) => {
   const links = [
     { to: '/admin/dashboard', label: 'Org Dashboard', icon: BarChart3 },
     { to: '/admin/cycles', label: 'Cycle Management', icon: RotateCw },
@@ -153,11 +153,11 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed }) => {
     { to: '/admin/audit', label: 'Audit & Governance', icon: ShieldCheck },
     { to: '/admin/escalations', label: 'Escalations', icon: AlertCircle },
   ];
-  return <SidebarContainer role="Admin" links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+  return <SidebarContainer role="Admin" name={name} links={links} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
 };
 
-export const LeftSidebar = ({ role, isCollapsed, setIsCollapsed }) => {
-  if (role === 'Admin') return <AdminSidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
-  if (role === 'Manager') return <ManagerSidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
-  return <EmployeeSidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+export const LeftSidebar = ({ role, name, isCollapsed, setIsCollapsed }) => {
+  if (role === 'Admin') return <AdminSidebar name={name} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+  if (role === 'Manager') return <ManagerSidebar name={name} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
+  return <EmployeeSidebar name={name} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />;
 };
