@@ -1,242 +1,625 @@
 import React, { useState, useEffect } from 'react';
 import { getTeamData } from '../../api/manager';
-import { Search, Filter, AlertCircle, RefreshCw, Calendar, User, Tag, Award } from 'lucide-react';
+import { 
+  createSharedKPI, 
+  fetchSharedKPIs, 
+  updateSharedKPIProgress, 
+  fetchLinkedEmployeeGoals 
+} from '../../api/goals';
+import { 
+  Target, 
+  Users, 
+  Plus, 
+  Sliders, 
+  ClipboardList, 
+  CheckCircle2, 
+  AlertCircle, 
+  Layers, 
+  Percent, 
+  Calendar, 
+  User, 
+  ChevronDown, 
+  ChevronUp, 
+  CheckSquare, 
+  RefreshCw,
+  Trash2
+} from 'lucide-react';
 
 export default function SharedGoals() {
-  const [teamData, setTeamData] = useState([]);
+  const [activeTab, setActiveTab] = useState('list'); // 'list' or 'create'
+  const [sharedKPIs, setSharedKPIs] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('All');
-  const [selectedThrustArea, setSelectedThrustArea] = useState('All');
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [success, setSuccess] = useState('');
+  
+  // Expanded KPI details state
+  const [expandedKpiId, setExpandedKpiId] = useState(null);
+  const [linkedGoals, setLinkedGoals] = useState([]);
+  const [loadingLinked, setLoadingLinked] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    target: '',
+    uom: 'Percentage (%)',
+    timeline: 'Q1 2026',
+    department: 'Sales',
+    default_weight: 10,
+    assigned_employee_ids: []
+  });
+  const [assignMethod, setAssignMethod] = useState('department'); // 'department' or 'specific'
+
+  // Sync / Achievement update state
+  const [updatingKpiId, setUpdatingKpiId] = useState(null);
+  const [tempAchievements, setTempAchievements] = useState({});
 
   useEffect(() => {
-    fetchSharedGoals();
-  }, [currentYear]);
+    loadData();
+  }, []);
 
-  const fetchSharedGoals = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getTeamData(currentYear);
-      setTeamData(data);
+      const kpis = await fetchSharedKPIs();
+      setSharedKPIs(kpis);
+      const team = await getTeamData();
+      setTeamMembers(team);
     } catch (err) {
-      console.error('Error fetching team goals:', err);
-      setError('Failed to load team goals. Please ensure you are logged in as a Manager.');
+      console.error('Error fetching data:', err);
+      setError('Failed to load shared KPIs and team details.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Flatten the goals list to include owner details inside the goal object for easier filtering
-  const allTeamGoals = teamData.flatMap(member => 
-    (member.goals || []).map(goal => ({
-      ...goal,
-      ownerName: member.name,
-      ownerEmail: member.email,
-      ownerId: member.id
-    }))
-  );
+  const handleCreateKPI = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
 
-  // Extract unique thrust areas and statuses for filters
-  const uniqueThrustAreas = [...new Set(allTeamGoals.map(g => g.thrust_area?.name || 'Unassigned'))];
-  const uniqueStatuses = [...new Set(allTeamGoals.map(g => g.status))];
+    if (!formData.title || !formData.target || !formData.timeline) {
+      setError('Title, Target, and Timeline are required fields.');
+      return;
+    }
 
-  // Apply filters
-  const filteredGoals = allTeamGoals.filter(goal => {
-    const matchesSearch = 
-      goal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      goal.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (goal.description && goal.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (formData.default_weight < 10) {
+      setError('Minimum default weightage must be 10% per guidelines.');
+      return;
+    }
 
-    const matchesStatus = selectedStatus === 'All' || goal.status === selectedStatus;
-    const matchesThrustArea = selectedThrustArea === 'All' || (goal.thrust_area?.name || 'Unassigned') === selectedThrustArea;
+    try {
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        target: parseFloat(formData.target),
+        uom: formData.uom,
+        timeline: formData.timeline,
+        department: formData.department,
+        default_weight: parseInt(formData.default_weight),
+        assigned_employee_ids: assignMethod === 'specific' ? formData.assigned_employee_ids : null
+      };
 
-    return matchesSearch && matchesStatus && matchesThrustArea;
-  });
-
-  const getStatusBadgeClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'approved':
-        return 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
-      case 'pending':
-      case 'pending review':
-        return 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
-      case 'draft':
-        return 'bg-blue-500/10 text-blue-600 border border-blue-500/20';
-      case 'rejected':
-        return 'bg-rose-500/10 text-rose-600 border border-rose-500/20';
-      default:
-        return 'bg-slate-500/10 text-slate-600 border border-slate-500/20';
+      await createSharedKPI(payload);
+      setSuccess('Shared KPI created and assigned successfully!');
+      
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        target: '',
+        uom: 'Percentage (%)',
+        timeline: 'Q1 2026',
+        department: 'Sales',
+        default_weight: 10,
+        assigned_employee_ids: []
+      });
+      
+      // Reload and switch tab
+      await loadData();
+      setActiveTab('list');
+    } catch (err) {
+      console.error('Error creating KPI:', err);
+      setError('Failed to create Shared KPI. Make sure the target is numeric.');
     }
   };
 
+  const toggleKPIExpand = async (kpiId) => {
+    if (expandedKpiId === kpiId) {
+      setExpandedKpiId(null);
+      setLinkedGoals([]);
+      return;
+    }
+
+    setExpandedKpiId(kpiId);
+    setLoadingLinked(true);
+    try {
+      const goals = await fetchLinkedEmployeeGoals(kpiId);
+      setLinkedGoals(goals);
+    } catch (err) {
+      console.error('Error loading linked goals:', err);
+    } finally {
+      setLoadingLinked(false);
+    }
+  };
+
+  const handleUpdateProgress = async (kpiId) => {
+    const val = tempAchievements[kpiId];
+    if (val === undefined || val === '') return;
+
+    setUpdatingKpiId(kpiId);
+    try {
+      await updateSharedKPIProgress(kpiId, parseFloat(val));
+      
+      // Update local state
+      setSharedKPIs(prev => prev.map(k => {
+        if (k.id === kpiId) {
+          return { ...k, current_achievement: val };
+        }
+        return k;
+      }));
+
+      // If this KPI is currently expanded, refresh linked goals to reflect updated progress
+      if (expandedKpiId === kpiId) {
+        const updatedGoals = await fetchLinkedEmployeeGoals(kpiId);
+        setLinkedGoals(updatedGoals);
+      }
+
+      setSuccess('Shared KPI progress updated. All assigned employee goals synchronized!');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error('Error updating progress:', err);
+      setError('Failed to update progress.');
+    } finally {
+      setUpdatingKpiId(null);
+    }
+  };
+
+  const handleCheckboxChange = (employeeId) => {
+    setFormData(prev => {
+      const list = prev.assigned_employee_ids.includes(employeeId)
+        ? prev.assigned_employee_ids.filter(id => id !== employeeId)
+        : [...prev.assigned_employee_ids, employeeId];
+      return { ...prev, assigned_employee_ids: list };
+    });
+  };
+
   return (
-    <div className="w-full animate-in fade-in duration-500 px-4 md:px-8 py-6">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="w-full animate-in fade-in duration-500 px-4 md:px-8 py-6 space-y-8">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Shared Goals Dashboard</h1>
-          <p className="text-secondary font-body-lg text-body-lg">
-            Monitor and track the strategic objectives of all employees reporting to you.
+          <h1 className="font-headline-lg text-4xl font-black text-on-surface tracking-tight leading-none flex items-center gap-3">
+            <Layers className="text-primary" size={32} />
+            <span>Shared & Department KPIs</span>
+          </h1>
+          <p className="text-secondary font-body-lg text-sm mt-2">
+            Pushed objectives defined by Managers, where employees manage their own execution tasks.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] self-center">Year:</label>
-          <select 
-            className="bg-surface py-2 px-4 rounded-xl border-none neumorphic-inset focus:ring-2 focus:ring-primary font-bold text-on-surface"
-            value={currentYear}
-            onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-          >
-            <option value={2026}>2026</option>
-            <option value={2025}>2025</option>
-            <option value={2024}>2024</option>
-          </select>
+        
+        {/* Tab Controls */}
+        <div className="flex bg-surface-dim/40 p-1.5 rounded-2xl border border-white/20 shadow-inner">
           <button 
-            onClick={fetchSharedGoals}
-            className="p-3 rounded-xl bg-surface text-primary hover:text-primary-dark neumorphic-outset hover:scale-105 active:scale-95 transition-all"
-            title="Refresh Goals"
+            onClick={() => setActiveTab('list')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 ${
+              activeTab === 'list' 
+                ? 'bg-surface text-primary shadow' 
+                : 'text-secondary hover:text-on-surface'
+            }`}
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <ClipboardList size={16} />
+            <span>Active KPIs</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('create')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 ${
+              activeTab === 'create' 
+                ? 'bg-surface text-primary shadow' 
+                : 'text-secondary hover:text-on-surface'
+            }`}
+          >
+            <Plus size={16} />
+            <span>Create & Assign KPI</span>
           </button>
         </div>
       </header>
 
-      {error && (
-        <div className="bg-error-container/20 border border-error/20 p-4 rounded-2xl flex items-start gap-3 text-error mb-8">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-bold text-sm">Error Loading Goals</h3>
-            <p className="text-xs text-error/80 mt-1">{error}</p>
-          </div>
+      {/* Notifications */}
+      {success && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center gap-3 animate-in fade-in duration-300">
+          <CheckCircle2 size={20} />
+          <p className="font-bold text-xs">{success}</p>
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="bg-surface rounded-3xl p-6 mb-8 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] border border-white/20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary" size={18} />
-            <input 
-              type="text"
-              placeholder="Search by employee, title, description..."
-              className="w-full bg-surface py-3 pl-12 pr-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface placeholder:text-secondary/50"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-3">
-            <Filter className="text-secondary shrink-0" size={18} />
-            <select
-              className="w-full bg-surface p-3 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-              {uniqueStatuses.map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Thrust Area Filter */}
-          <div className="flex items-center gap-3">
-            <Tag className="text-secondary shrink-0" size={18} />
-            <select
-              className="w-full bg-surface p-3 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
-              value={selectedThrustArea}
-              onChange={(e) => setSelectedThrustArea(e.target.value)}
-            >
-              <option value="All">All Focus Areas</option>
-              {uniqueThrustAreas.map(area => (
-                <option key={area} value={area}>{area}</option>
-              ))}
-            </select>
-          </div>
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 flex items-center gap-3 animate-in fade-in duration-300">
+          <AlertCircle size={20} />
+          <p className="font-bold text-xs">{error}</p>
         </div>
-      </div>
+      )}
 
-      {/* Goals Content */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {[1, 2, 3, 4].map(n => (
-            <div key={n} className="bg-surface rounded-3xl p-8 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] border border-white/20 h-64 animate-pulse">
-              <div className="h-6 bg-surface-dim rounded w-1/3 mb-4"></div>
-              <div className="h-8 bg-surface-dim rounded w-2/3 mb-6"></div>
-              <div className="h-4 bg-surface-dim rounded w-full mb-2"></div>
-              <div className="h-4 bg-surface-dim rounded w-4/5 mb-6"></div>
-              <div className="h-10 bg-surface-dim rounded w-1/2 mt-auto"></div>
+      {/* Tab 1: KPIs Dashboard */}
+      {activeTab === 'list' && (
+        <div className="space-y-6">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] text-secondary">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="font-bold animate-pulse text-xs uppercase tracking-widest">Loading department KPIs...</p>
             </div>
-          ))}
-        </div>
-      ) : filteredGoals.length === 0 ? (
-        <div className="bg-surface rounded-3xl p-16 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] border border-white/20 text-center flex flex-col items-center justify-center">
-          <Award size={48} className="text-secondary mb-4 opacity-50" />
-          <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No Goals Found</h3>
-          <p className="text-secondary text-sm max-w-md">
-            There are no goals matching your search filters, or your reporting employees haven't created goals for {currentYear} yet.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredGoals.map((goal) => (
-            <div 
-              key={goal.id} 
-              className="bg-surface rounded-3xl p-8 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] border border-white/20 flex flex-col hover:scale-[1.02] transition-all duration-300 relative group"
-            >
-              {/* Top Row: Employee Name and Status */}
-              <div className="flex justify-between items-start gap-4 mb-4">
-                <div className="flex items-center gap-2 text-secondary text-xs font-bold uppercase tracking-wider">
-                  <User size={14} className="text-primary" />
-                  <span>{goal.ownerName}</span>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${getStatusBadgeClass(goal.status)}`}>
-                  {goal.status}
-                </span>
-              </div>
-
-              {/* Title and Description */}
-              <h2 className="font-headline-md text-headline-md text-on-surface mb-2 group-hover:text-primary transition-colors">
-                {goal.title}
-              </h2>
-              <p className="text-secondary text-sm mb-6 line-clamp-3">
-                {goal.description || 'No description provided.'}
+          ) : sharedKPIs.length === 0 ? (
+            <div className="bg-surface p-16 rounded-3xl shadow-[inset_6px_6px_12px_#AEAEC0,inset_-6px_-6px_12px_#FFFFFF] text-center border border-white/20">
+              <Target size={48} className="text-secondary/40 mx-auto mb-4" />
+              <h3 className="text-xl font-black text-on-surface mb-2">No Shared KPIs Active</h3>
+              <p className="text-secondary text-sm max-w-md mx-auto mb-6">
+                You haven't defined any shared departmental KPIs or goals yet. Get started by defining key organizational targets.
               </p>
-
-              {/* Target & Weight Badges */}
-              <div className="grid grid-cols-3 gap-4 p-4 rounded-2xl bg-surface-dim shadow-inner border border-white/10 mb-6 mt-auto">
-                <div>
-                  <span className="text-[10px] font-black text-secondary uppercase tracking-widest block mb-1">Target</span>
-                  <span className="text-sm font-bold text-on-surface">{goal.target} <span className="text-[10px] text-secondary font-normal">{goal.uom}</span></span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-secondary uppercase tracking-widest block mb-1">Weight</span>
-                  <span className="text-sm font-bold text-primary">{goal.weight}%</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-secondary uppercase tracking-widest block mb-1">Year</span>
-                  <span className="text-sm font-bold text-on-surface">{goal.year}</span>
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="flex justify-between items-center border-t border-surface-dim pt-4 mt-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-secondary">
-                  <Tag size={12} />
-                  <span>{goal.thrust_area?.name || 'General Focus'}</span>
-                </div>
-                <a 
-                  href={`/manager/goals/review/${goal.ownerId}`} 
-                  className="px-5 py-2 rounded-xl bg-surface text-primary font-bold text-xs neumorphic-outset hover:scale-105 active:scale-95 hover:text-primary-dark transition-all flex items-center gap-1"
-                >
-                  Review Goals →
-                </a>
-              </div>
+              <button 
+                onClick={() => setActiveTab('create')}
+                className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-lg hover:scale-105 transition-all"
+              >
+                Create First Shared KPI
+              </button>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-6">
+              {sharedKPIs.map((kpi) => {
+                const isExpanded = expandedKpiId === kpi.id;
+                
+                return (
+                  <div 
+                    key={kpi.id} 
+                    className="bg-surface rounded-3xl border border-white/20 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] overflow-hidden transition-all duration-300"
+                  >
+                    {/* KPI Main Card Content */}
+                    <div className="p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-surface-dim/40">
+                      <div className="space-y-3 max-w-2xl">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            Department: {kpi.department}
+                          </span>
+                          <span className="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                            <Calendar size={12} />
+                            {kpi.timeline}
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-black text-on-surface leading-tight">{kpi.title}</h3>
+                        <p className="text-secondary text-sm leading-relaxed">{kpi.description || 'No description provided.'}</p>
+                      </div>
+
+                      {/* Achievement Tracker Interface */}
+                      <div className="bg-surface-dim/35 p-6 rounded-2xl border border-white/10 shadow-inner flex flex-col md:flex-row items-center gap-6 min-w-[320px]">
+                        <div className="text-center md:text-left flex flex-col">
+                          <span className="text-[10px] font-black text-secondary uppercase tracking-widest leading-none">Shared Achievement</span>
+                          <span className="text-3xl font-black text-primary mt-1.5">
+                            {kpi.current_achievement} / {kpi.target} 
+                            <span className="text-xs text-secondary font-medium ml-1.5">{kpi.uom.replace(/\([^)]*\)/, '')}</span>
+                          </span>
+                        </div>
+                        
+                        {/* Quick Update Progress Input */}
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          <input 
+                            type="number"
+                            step="any"
+                            placeholder="Val"
+                            className="w-20 bg-surface py-2.5 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-center text-on-surface"
+                            value={tempAchievements[kpi.id] !== undefined ? tempAchievements[kpi.id] : kpi.current_achievement}
+                            onChange={(e) => setTempAchievements({ ...tempAchievements, [kpi.id]: e.target.value })}
+                          />
+                          <button 
+                            disabled={updatingKpiId === kpi.id}
+                            onClick={() => handleUpdateProgress(kpi.id)}
+                            className="bg-primary hover:bg-primary-dark text-on-primary font-black text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-xl shadow active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            {updatingKpiId === kpi.id ? 'Syncing...' : 'Sync'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Drill-down Toggle Footer */}
+                    <div className="bg-surface-dim/15 px-8 py-3 flex justify-between items-center">
+                      <button 
+                        onClick={() => toggleKPIExpand(kpi.id)}
+                        className="text-secondary hover:text-primary font-bold text-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        <span>{isExpanded ? 'Hide Employee Progress' : 'View Assigned Employee Progress'}</span>
+                      </button>
+                      
+                      <div className="text-secondary/60 text-[10px] font-bold uppercase tracking-wider">
+                        Linked Employee Goals & Action Items
+                      </div>
+                    </div>
+
+                    {/* Drill-down Content */}
+                    {isExpanded && (
+                      <div className="p-8 bg-surface-dim/10 border-t border-surface-dim/40 space-y-6">
+                        {loadingLinked ? (
+                          <div className="flex items-center gap-2 justify-center py-6 text-secondary animate-pulse text-xs font-bold uppercase tracking-widest">
+                            <RefreshCw size={16} className="animate-spin" />
+                            <span>Loading linked employee goals...</span>
+                          </div>
+                        ) : linkedGoals.length === 0 ? (
+                          <p className="text-secondary text-center text-xs font-bold uppercase tracking-widest py-4">
+                            No employees assigned to this Shared KPI yet.
+                          </p>
+                        ) : (
+                          <div className="space-y-6">
+                            <h4 className="font-bold text-sm text-on-surface uppercase tracking-wider border-b border-surface-dim pb-2 flex items-center gap-2">
+                              <Users size={16} className="text-primary" />
+                              <span>Assigned Team Contributions ({linkedGoals.length})</span>
+                            </h4>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {linkedGoals.map((goal) => (
+                                <div key={goal.id} className="bg-surface p-6 rounded-2xl shadow border border-white/20 flex flex-col justify-between space-y-4">
+                                  {/* Employee details & weightage */}
+                                  <div className="flex justify-between items-start border-b border-surface-dim pb-3">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-primary text-on-primary font-black text-xs flex items-center justify-center shadow">
+                                        {goal.owner?.name?.substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-sm text-on-surface">{goal.owner?.name}</span>
+                                        <span className="text-[10px] text-secondary">{goal.owner?.email}</span>
+                                      </div>
+                                    </div>
+                                    <div className="bg-surface-dim px-3 py-1.5 rounded-xl text-center leading-none border border-white/10">
+                                      <span className="font-black text-xs text-primary">{goal.weight}%</span>
+                                      <span className="block text-[7px] text-secondary uppercase font-bold tracking-widest mt-0.5">Weight</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Personal notes */}
+                                  <div>
+                                    <span className="text-[8px] font-black text-secondary uppercase tracking-widest block mb-1">Employee Personal Notes</span>
+                                    <p className="text-xs text-secondary italic leading-relaxed bg-surface-dim/40 p-2.5 rounded-xl border border-white/5">
+                                      {goal.personal_notes || "No personal notes provided yet."}
+                                    </p>
+                                  </div>
+
+                                  {/* Task list summary (what the employee added) */}
+                                  <div className="space-y-2">
+                                    <span className="text-[8px] font-black text-secondary uppercase tracking-widest block">Individualized Action Items (HOW)</span>
+                                    {goal.tasks && goal.tasks.length > 0 ? (
+                                      <div className="space-y-1.5">
+                                        {goal.tasks.map((task) => (
+                                          <div key={task.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-surface-dim/30 border border-white/5">
+                                            <div className="flex items-center gap-2 max-w-[70%]">
+                                              <div className={`w-1.5 h-1.5 rounded-full ${
+                                                task.status?.toLowerCase() === 'completed' ? 'bg-emerald-500' : 'bg-amber-500'
+                                              }`}></div>
+                                              <span className="font-bold text-on-surface truncate">{task.title}</span>
+                                            </div>
+                                            <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded-lg">
+                                              {task.progress}%
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-secondary font-bold uppercase tracking-widest block italic py-2">
+                                        Employee has not defined action items yet.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Create Shared KPI Form */}
+      {activeTab === 'create' && (
+        <div className="bg-surface rounded-3xl p-8 border border-white/20 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] max-w-4xl mx-auto">
+          <h2 className="text-2xl font-black text-on-surface tracking-tight mb-8 border-b border-surface-dim pb-4 flex items-center gap-2">
+            <Target className="text-primary" size={24} />
+            <span>Define Shared Departmental KPI</span>
+          </h2>
+
+          <form onSubmit={handleCreateKPI} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Goal Title */}
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Goal Title *</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Improve Customer Satisfaction"
+                  required
+                  className="w-full bg-surface py-3 px-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                />
+              </div>
+
+              {/* Goal Description */}
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Description / Alignment details</label>
+                <textarea 
+                  placeholder="e.g. Enhance front-line support operations to reach a higher satisfaction score."
+                  rows={3}
+                  className="w-full bg-surface py-3 px-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              {/* Target Score */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Target Achievement Value *</label>
+                <input 
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 90.00"
+                  required
+                  className="w-full bg-surface py-3 px-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.target}
+                  onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                />
+              </div>
+
+              {/* Measurement Type (UOM) */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Measurement Type (UOM) *</label>
+                <select 
+                  className="w-full bg-surface p-3 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.uom}
+                  onChange={(e) => setFormData({ ...formData, uom: e.target.value })}
+                >
+                  <option value="Percentage (%)">Percentage (%)</option>
+                  <option value="Numeric (#)">Numeric (#)</option>
+                  <option value="Currency ($)">Currency ($)</option>
+                  <option value="Timeline">Timeline</option>
+                </select>
+              </div>
+
+              {/* Timeline / Quarter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Timeline / Target Quarter *</label>
+                <select 
+                  className="w-full bg-surface p-3 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.timeline}
+                  onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
+                >
+                  <option value="Q1 2026">Q1 2026</option>
+                  <option value="Q2 2026">Q2 2026</option>
+                  <option value="Q3 2026">Q3 2026</option>
+                  <option value="Q4 2026">Q4 2026</option>
+                </select>
+              </div>
+
+              {/* Default Weightage */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Default Weightage (% - Min 10%) *</label>
+                <input 
+                  type="number"
+                  min={10}
+                  max={100}
+                  required
+                  className="w-full bg-surface py-3 px-4 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.default_weight}
+                  onChange={(e) => setFormData({ ...formData, default_weight: e.target.value })}
+                />
+              </div>
+
+              {/* Department */}
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Target Department *</label>
+                <select 
+                  className="w-full bg-surface p-3 rounded-2xl border-none neumorphic-inset focus:ring-2 focus:ring-primary text-sm font-bold text-on-surface"
+                  value={formData.department}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                >
+                  <option value="Sales">Sales</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="HR">HR</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Operations">Operations</option>
+                </select>
+              </div>
+
+              {/* Assignment Mode */}
+              <div className="flex flex-col gap-3 md:col-span-2 border-t border-surface-dim pt-6 mt-2">
+                <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Assignees selection method</label>
+                <div className="flex gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setAssignMethod('department')}
+                    className={`flex-1 py-3.5 rounded-2xl font-black text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 ${
+                      assignMethod === 'department'
+                        ? 'bg-primary text-on-primary shadow-lg scale-102'
+                        : 'bg-surface text-secondary border border-white/20 neumorphic-outset'
+                    }`}
+                  >
+                    <Layers size={16} />
+                    <span>Assign to all in Department</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setAssignMethod('specific')}
+                    className={`flex-1 py-3.5 rounded-2xl font-black text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 ${
+                      assignMethod === 'specific'
+                        ? 'bg-primary text-on-primary shadow-lg scale-102'
+                        : 'bg-surface text-secondary border border-white/20 neumorphic-outset'
+                    }`}
+                  >
+                    <Users size={16} />
+                    <span>Select Specific Employees</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Specific Employees Multi-Select */}
+              {assignMethod === 'specific' && (
+                <div className="flex flex-col gap-3 md:col-span-2 animate-in fade-in duration-300">
+                  <label className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] ml-1">Select Employees ({formData.assigned_employee_ids.length} selected)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-60 overflow-y-auto p-2 bg-surface-dim/20 rounded-2xl border border-white/5">
+                    {teamMembers.length === 0 ? (
+                      <span className="text-xs text-secondary font-bold p-4 text-center col-span-2">No reporting team members found.</span>
+                    ) : (
+                      teamMembers.map(member => {
+                        const isSelected = formData.assigned_employee_ids.includes(member.id);
+                        return (
+                          <div 
+                            key={member.id}
+                            onClick={() => handleCheckboxChange(member.id)}
+                            className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary/40 shadow-inner'
+                                : 'bg-surface border-white/20 shadow hover:border-primary/20'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                              isSelected ? 'bg-primary border-primary text-on-primary' : 'border-secondary/40'
+                            }`}>
+                              {isSelected && <CheckSquare size={12} />}
+                            </div>
+                            <div className="flex flex-col leading-none">
+                              <span className="font-bold text-xs text-on-surface">{member.name}</span>
+                              <span className="text-[8px] text-secondary mt-0.5">{member.email}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Action buttons */}
+            <div className="border-t border-surface-dim pt-6 flex justify-end gap-4">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('list')}
+                className="px-6 py-3 rounded-2xl bg-surface text-secondary font-bold text-xs neumorphic-outset hover:scale-105 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="px-8 py-3 rounded-2xl bg-primary text-on-primary font-black text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all"
+              >
+                Create and Assign Goal
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

@@ -104,9 +104,19 @@ export default function EmployeeDashboard() {
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-on-surface tracking-tight">Welcome back, {data.user_name}</h1>
-          <p className="text-secondary font-medium flex items-center gap-2 mt-1">
-            <Calendar size={16} />
-            {today}
+          <p className="text-secondary font-medium flex items-center gap-x-2 gap-y-1 flex-wrap mt-1">
+            <span className="flex items-center gap-2">
+              <Calendar size={16} />
+              {today}
+            </span>
+            {data.manager_name && (
+              <>
+                <span className="text-secondary/40 hidden sm:inline">•</span>
+                <span className="bg-primary/10 text-primary px-3 py-0.5 rounded-full text-xs font-bold">
+                  Reporting to: {data.manager_name}
+                </span>
+              </>
+            )}
           </p>
         </div>
         

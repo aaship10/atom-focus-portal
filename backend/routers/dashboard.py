@@ -42,8 +42,12 @@ async def get_employee_dashboard(
     user_id = current_user["id"]
     current_year = datetime.datetime.utcnow().year
 
-    # Fetch User info
-    user_result = await db.execute(select(User).where(User.id == user_id))
+    # Fetch User info with manager loaded
+    user_result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .options(joinedload(User.manager))
+    )
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -75,11 +79,14 @@ async def get_employee_dashboard(
         ) for g in sorted_goals
     ]
 
+    manager_name = user.manager.name if user.manager else None
+
     return EmployeeDashboardSummary(
         total_goals=total_goals,
         pending_approvals=pending_approvals,
         off_track_goals=off_track_goals,
         overall_progress=round(overall_progress, 1),
         top_goals=top_goals,
-        user_name=user.name
+        user_name=user.name,
+        manager_name=manager_name
     )

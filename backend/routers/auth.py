@@ -31,7 +31,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
         result = await db.execute(select(User).options(selectinload(User.role)).where(User.id == new_user.id))
         new_user = result.scalars().first()
         
-        print(f"✅ NEW USER REGISTERED: {new_user.email} | Role ID: {new_user.role_id}")
+        print(f"[OK] NEW USER REGISTERED: {new_user.email} | Role ID: {new_user.role_id}")
         
         return UserResponse(
             id=new_user.id,
@@ -41,7 +41,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
         )
     except Exception as e:
         await db.rollback()
-        print(f"❌ DB INSERT ERROR: {str(e)}")
+        print(f"[ERROR] DB INSERT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/login", response_model=Token)
@@ -60,5 +60,5 @@ async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
         data={"id": user.id, "role": user.role.name if user.role else "Employee", "name": user.name}
     )
     
-    print(f"🔓 USER SUCCESSFUL LOGIN: {user.email}")
+    print(f"[SUCCESS] USER SUCCESSFUL LOGIN: {user.email}")
     return {"access_token": access_token, "token_type": "bearer"}

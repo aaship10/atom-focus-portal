@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 import datetime
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -41,7 +42,13 @@ async def create_goal(
         # Reload with relationships for response
         result = await db.execute(
             select(Goal)
-            .options(joinedload(Goal.thrust_area), joinedload(Goal.achievements), joinedload(Goal.checkins))
+            .options(
+                joinedload(Goal.thrust_area), 
+                joinedload(Goal.achievements), 
+                joinedload(Goal.checkins),
+                joinedload(Goal.shared_kpi),
+                joinedload(Goal.tasks)
+            )
             .where(Goal.id == new_goal.id)
         )
         return result.unique().scalar_one()
@@ -59,7 +66,9 @@ async def get_goals(
     query = select(Goal).options(
         joinedload(Goal.thrust_area), 
         joinedload(Goal.achievements),
-        joinedload(Goal.checkins)
+        joinedload(Goal.checkins),
+        joinedload(Goal.shared_kpi),
+        joinedload(Goal.tasks)
     )
     
     if owner_id:
@@ -114,7 +123,7 @@ async def log_achievement(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    if goal.locked:
+    if goal.locked and not goal.shared_kpi_id: # Allowed for shared KPI achievement sync
         raise HTTPException(status_code=403, detail="Goal is locked for the current period")
 
     # Check for existing achievement for this quarter (Upsert Logic)
@@ -168,3 +177,150 @@ async def submit_goal(
 async def get_thrust_areas(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(ThrustArea))
     return result.scalars().all()
+
+# --- Employee-Owned Tasks Endpoints ---
+
+from models import EmployeeTask
+from schemas import EmployeeTaskCreate, EmployeeTaskUpdate, EmployeeTaskResponse
+
+@router.get("/{goal_id}/tasks", response_model=List[EmployeeTaskResponse])
+async def get_goal_tasks(
+    goal_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify goal ownership
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.owner_id != current_user["id"]:
+        # Allow manager to view tasks too
+        user_result = await db.execute(select(User).where(User.id == goal.owner_id))
+        owner = user_result.scalar_one_or_none()
+        if not owner or owner.manager_id != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Not authorized to view tasks for this goal.")
+
+    result = await db.execute(
+        select(EmployeeTask).where(EmployeeTask.employee_goal_id == goal_id).order_by(EmployeeTask.created_at.asc())
+    )
+    return result.scalars().all()
+
+@router.post("/{goal_id}/tasks", response_model=EmployeeTaskResponse, status_code=status.HTTP_201_CREATED)
+async def create_goal_task(
+    goal_id: int,
+    task_in: EmployeeTaskCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can add tasks.")
+
+    new_task = EmployeeTask(
+        employee_goal_id=goal_id,
+        title=task_in.title,
+        status=task_in.status or "Pending",
+        progress=task_in.progress or 0
+    )
+    db.add(new_task)
+    try:
+        await db.commit()
+        await db.refresh(new_task)
+        return new_task
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{goal_id}/tasks/{task_id}", response_model=EmployeeTaskResponse)
+async def update_goal_task(
+    goal_id: int,
+    task_id: int,
+    task_in: EmployeeTaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can update tasks.")
+
+    task = await db.get(EmployeeTask, task_id)
+    if not task or task.employee_goal_id != goal_id:
+        raise HTTPException(status_code=404, detail="Task not found under this goal")
+
+    if task_in.title is not None:
+        task.title = task_in.title
+    if task_in.status is not None:
+        task.status = task_in.status
+    if task_in.progress is not None:
+        if task_in.progress < 0 or task_in.progress > 100:
+            raise HTTPException(status_code=400, detail="Progress must be between 0 and 100")
+        task.progress = task_in.progress
+
+    try:
+        await db.commit()
+        await db.refresh(task)
+        return task
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{goal_id}/tasks/{task_id}")
+async def delete_goal_task(
+    goal_id: int,
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can delete tasks.")
+
+    task = await db.get(EmployeeTask, task_id)
+    if not task or task.employee_goal_id != goal_id:
+        raise HTTPException(status_code=404, detail="Task not found under this goal")
+
+    try:
+        await db.delete(task)
+        await db.commit()
+        return {"success": True, "message": "Task deleted successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Editable Employee Fields Endpoint ---
+
+class PersonalNotesWeightUpdate(BaseModel):
+    weight: int
+    personal_notes: str
+
+@router.put("/{goal_id}/personal-notes-weight")
+async def update_personal_notes_weight(
+    goal_id: int,
+    payload: PersonalNotesWeightUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can update their weightage and personal notes.")
+
+    if payload.weight < 10 or payload.weight > 100:
+        raise HTTPException(status_code=400, detail="Weight must be between 10% and 100%")
+
+    goal.weight = payload.weight
+    goal.personal_notes = payload.personal_notes
+
+    try:
+        await db.commit()
+        return {"success": True, "message": "Goal weight and personal notes updated successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

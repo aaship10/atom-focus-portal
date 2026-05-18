@@ -69,10 +69,53 @@ class GoalCheckinResponse(BaseModel):
     checkin_date: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class EmployeeTaskResponse(BaseModel):
+    id: int
+    employee_goal_id: int
+    title: str
+    status: str
+    progress: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class EmployeeTaskCreate(BaseModel):
+    title: str
+    status: Optional[str] = "Pending"
+    progress: Optional[int] = 0
+
+class EmployeeTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    progress: Optional[int] = None
+
+class SharedKPIResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    target: Decimal
+    uom: str
+    timeline: str
+    department: str
+    created_by: int
+    current_achievement: Decimal
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class SharedKPICreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    target: Decimal
+    uom: str
+    timeline: str
+    department: str
+    default_weight: Optional[int] = None
+    assigned_employee_ids: Optional[List[int]] = None
+
 class GoalResponse(BaseModel):
     id: int
     owner_id: int
-    thrust_area_id: int
+    thrust_area_id: Optional[int] = None
+    shared_kpi_id: Optional[int] = None
     title: str
     description: Optional[str] = None
     uom: str
@@ -81,11 +124,14 @@ class GoalResponse(BaseModel):
     year: int
     status: str
     locked: bool
+    personal_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     thrust_area: Optional[ThrustAreaSchema] = None
     achievements: List[GoalAchievementResponse] = []
     checkins: List[GoalCheckinResponse] = []
+    shared_kpi: Optional[SharedKPIResponse] = None
+    tasks: List[EmployeeTaskResponse] = []
     model_config = ConfigDict(from_attributes=True)
 
 class GoalSnapshot(BaseModel):
@@ -102,6 +148,7 @@ class EmployeeDashboardSummary(BaseModel):
     overall_progress: float
     top_goals: List[GoalSnapshot]
     user_name: str
+    manager_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class GoalApprovalUpdate(BaseModel):

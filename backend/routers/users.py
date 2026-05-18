@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from database import get_db
 from models import User, Role
 from typing import List
@@ -98,14 +99,20 @@ async def get_my_profile(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    user = await db.get(User, current_user["id"])
+    user_result = await db.execute(
+        select(User)
+        .where(User.id == current_user["id"])
+        .options(joinedload(User.manager))
+    )
+    user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {
         "id": user.id,
         "name": user.name,
         "email": user.email,
-        "manager_id": user.manager_id
+        "manager_id": user.manager_id,
+        "manager_name": user.manager.name if user.manager else None
     }
 
 @router.put("/me/manager")

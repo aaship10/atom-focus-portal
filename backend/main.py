@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from database import engine, Base
-from routers import auth, test, goals, dashboard, manager, users
+from routers import auth, test, goals, dashboard, manager, users, shared_kpis
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ app.include_router(goals.router)
 app.include_router(dashboard.router)
 app.include_router(manager.router)
 app.include_router(users.router)
+app.include_router(shared_kpis.router)
 
 @app.get("/")
 async def root():
