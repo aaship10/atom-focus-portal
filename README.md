@@ -1,6 +1,6 @@
-# 🎯 Focus Portal: In-House Goal-Setting and Tracking Portal
+# 🎯 Atom Focus Portal: In-House Goal-Setting and Tracking Portal
 
-Welcome to the **Focus Portal** (In-House Goal-Setting & Tracking Portal). Focus Portal is a modern, high-performance, full-stack enterprise platform designed to streamline organization-wide goal definition, cascading key performance indicators (KPIs), manager approval workflows, and quarterly check-ins.
+Welcome to the **Atom Focus Portal** (In-House Goal-Setting & Tracking Portal). Atom Focus Portal is a modern, high-performance, full-stack enterprise platform designed to streamline organization-wide goal definition, cascading key performance indicators (KPIs), manager approval workflows, and quarterly check-ins.
 
 This system enables a robust **Employee-Manager-HR Admin** relationship structure with premium, responsive, and tactile UI aesthetics.
 
@@ -8,7 +8,7 @@ This system enables a robust **Employee-Manager-HR Admin** relationship structur
 
 ## 🌟 Core System Roles & Capabilities
 
-### 1. 👤 Employee Portal (Phase 1 & Phase 2)
+### 1. 👤 Employee Portal
 *   **Drafting & Inline Modification**: Create, edit, and draft goal sheets. For any goal in `Draft` or `Rejected` status, employees can edit core parameters (Title, Description, Thrust Area, UoM, Targets) inline inside an accordion-style panel.
 *   **Real-Time Sheet Validation**: Real-time checklist panel enforces company compliance criteria before a goal sheet can be submitted for review:
     1.  **Total Weightage Sum**: Across all goals must equal exactly **100%**.
@@ -32,23 +32,6 @@ This system enables a robust **Employee-Manager-HR Admin** relationship structur
 ---
 
 ## 🛠️ Architecture & Tech Stack
-
-```mermaid
-graph LR
-    subgraph Frontend [React 19 SPA]
-        A[Vite 8] --> B[React Router v7]
-        B --> C[Tailwind CSS & Vanilla Neumorphism]
-    end
-    subgraph Backend [FastAPI Server]
-        D[FastAPI REST API] --> E[SQLAlchemy 2.0 ORM]
-        D --> F[Pydantic Validation]
-        D --> G[JWT Authentication]
-    end
-    subgraph Database [Relational DB]
-        E --> H[(SQLite / PostgreSQL)]
-    end
-    C <-->|HTTP REST / JWT| D
-```
 
 ### Backend (Python)
 *   **Framework**: FastAPI for fast, asynchronous endpoints.
@@ -92,9 +75,8 @@ graph LR
 4.  Configure environment variables inside `backend/.env`:
     ```ini
     DATABASE_URL=sqlite+aiosqlite:///./goals.db
-    SECRET_KEY=your-jwt-signing-secret-key-change-this
-    ALGORITHM=HS256
-    ACCESS_TOKEN_EXPIRE_MINUTES=480
+    JWT_SECRET=your-jwt-signing-secret-key-change-this
+    PORT=5000
     ```
 5.  Initialize the database schema:
     ```bash
@@ -107,7 +89,7 @@ graph LR
     ```
 7.  Run the development server:
     ```bash
-    uvicorn main:app --reload --port 8000
+    uvicorn main:app --reload
     ```
     *   API Documentation will be available at `http://127.0.0.1:8000/docs`.
 
@@ -138,9 +120,3 @@ graph LR
 *   **`GoalTask`**: Granular, action items managed by the employee to track how goals are being executed.
 *   **`GoalCheckin`**: Periodic actual progress logged by employees, with corresponding feedback notes and check-in comments added by managers.
 
----
-
-## 📜 Coding Guidelines & Design Standard
-*   **Premium Neumorphic Design**: Tailored shadows (`shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF]`) and soft gradients are standard. Avoid default plain browser inputs or elements.
-*   **No Placeholders**: Always present real-time, functioning widgets or fallback empty states rather than empty text.
-*   **Strict Security**: Backend routes dynamically verify user sessions (`current_user`) and strictly check manager-report relationships when reviewing or editing goals.
