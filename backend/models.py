@@ -23,6 +23,7 @@ class User(Base):
     manager = relationship("User", remote_side=[id], backref="direct_reports")
     goals = relationship("Goal", back_populates="owner")
     checkins = relationship("GoalCheckin", back_populates="manager")
+    audit_logs = relationship("GoalAuditLog", back_populates="user")
 
 class ThrustArea(Base):
     __tablename__ = "ThrustArea"
@@ -73,6 +74,7 @@ class Goal(Base):
     achievements = relationship("GoalAchievement", back_populates="goal", cascade="all, delete-orphan")
     checkins = relationship("GoalCheckin", back_populates="goal", cascade="all, delete-orphan")
     tasks = relationship("EmployeeTask", back_populates="goal", cascade="all, delete-orphan")
+    audit_logs = relationship("GoalAuditLog", back_populates="goal", cascade="all, delete-orphan")
 
 class GoalAchievement(Base):
     __tablename__ = "GoalAchievement"
@@ -110,3 +112,42 @@ class EmployeeTask(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     goal = relationship("Goal", back_populates="tasks")
+
+class Cycle(Base):
+    __tablename__ = "Cycle"
+    id = Column(Integer, primary_key=True, index=True)
+    quarter = Column(String(10), nullable=False) # "Q1", "Q2", "Q3", "Q4"
+    year = Column(Integer, nullable=False)
+    status = Column(String(50), default="Active") # "Active", "Closed"
+    goal_setting_start = Column(DateTime, nullable=True)
+    goal_setting_end = Column(DateTime, nullable=True)
+    checkin_start = Column(DateTime, nullable=True)
+    checkin_end = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class GoalAuditLog(Base):
+    __tablename__ = "GoalAuditLog"
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, ForeignKey("Goal.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey("User.id", ondelete="SET NULL"), nullable=True)
+    action = Column(String(100), nullable=False) # e.g. "Unlock Goal", "Update Target"
+    details = Column(Text, nullable=True)
+    previous_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    goal = relationship("Goal", back_populates="audit_logs")
+    user = relationship("User", back_populates="audit_logs")
+
+class EscalationLog(Base):
+    __tablename__ = "EscalationLog"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    manager_id = Column(Integer, ForeignKey("User.id", ondelete="SET NULL"), nullable=True)
+    type = Column(String(100), nullable=False) # "Missed Goal Submission", "Missed Manager Approval", "Missed Quarterly Check-in"
+    details = Column(Text, nullable=True)
+    resolved = Column(Boolean, default=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+    manager = relationship("User", foreign_keys=[manager_id])

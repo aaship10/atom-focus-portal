@@ -17,6 +17,11 @@ import SharedGoals from './pages/manager/SharedGoals';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
+import CycleManagement from './pages/admin/Cycles';
+import SystemConfig from './pages/admin/Config';
+import ReportsAndGovernance from './pages/admin/Reports';
+import AuditAndGovernance from './pages/admin/Audit';
+import EscalationTracking from './pages/admin/Escalations';
 
 // Navigation Components
 import { LeftSidebar } from './components/navigation/Sidebar';
@@ -101,6 +106,11 @@ function App() {
 
           {/* Admin Routes */}
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/cycles" element={<CycleManagement />} />
+          <Route path="/admin/config" element={<SystemConfig />} />
+          <Route path="/admin/reports" element={<ReportsAndGovernance />} />
+          <Route path="/admin/audit" element={<AuditAndGovernance />} />
+          <Route path="/admin/escalations" element={<EscalationTracking />} />
 
           {/* Root Redirect Logic */}
           <Route path="/" element={<RootRedirect />} />
