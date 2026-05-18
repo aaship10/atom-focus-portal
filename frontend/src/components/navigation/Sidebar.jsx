@@ -46,7 +46,7 @@ const SidebarLink = ({ to, icon: Icon, children, active, isCollapsed }) => (
 const UserSection = ({ role, name, isCollapsed }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   return (

@@ -2,7 +2,10 @@
 
 Welcome to the **Atom Focus Portal** (In-House Goal-Setting & Tracking Portal). Atom Focus Portal is a modern, high-performance, full-stack enterprise platform designed to streamline organization-wide goal definition, cascading key performance indicators (KPIs), manager approval workflows, and quarterly check-ins.
 
+🚀 **Live Deployment**: [https://atom-focus-portal.vercel.app](https://atom-focus-portal.vercel.app)
+
 This system enables a robust **Employee-Manager-HR Admin** relationship structure with premium, responsive, and tactile UI aesthetics.
+
 
 ---
 
@@ -28,6 +31,42 @@ This system enables a robust **Employee-Manager-HR Admin** relationship structur
 *   **User & Hierarchy Management**: Track reporting relationships (direct reports/reporting managers) and manage core employee-manager mappings.
 *   **KPI & Master Definition Control**: Define standard "Thrust Areas", configure departmental master KPIs, and cascade them globally.
 *   **Global Administrative Control**: Intervene to unlock locked goals for adjustments, reset password credentials, and view organization-wide completion reports.
+
+### 📈 System-Computed Progress Scores
+The system automatically calculates individual goal progress scores during quarterly check-ins based on the designated **Unit of Measurement (UoM)**:
+
+1. **Min (Numeric/% - Higher is better)**:
+   $$\text{Progress Score} = \left( \frac{\text{Achievement}}{\text{Target}} \right) \times 100\%$$
+   *(Capped dynamically between $0\%$ and $100\%$ on the dashboard, and up to $120\%$ for check-in overachievements)*
+
+2. **Max (Numeric/% - Lower is better)**:
+   $$\text{Progress Score} = \left( \frac{\text{Target}}{\text{Achievement}} \right) \times 100\%$$
+   *(Enables tracking of inverse metrics such as cost reductions or error rates, capped dynamically)*
+
+3. **Timeline (Date-based deadline comparison)**:
+   $$\text{Progress Score} = \begin{cases} 100\% & \text{if Completion Date} \le \text{Target Deadline} \\ 0\% & \text{otherwise} \end{cases}$$
+   *(Ensures binary timeline compliance tracking)*
+
+4. **Zero (Zero-based goal - Zero is success)**:
+   $$\text{Progress Score} = \begin{cases} 100\% & \text{if Achievement} = 0 \\ 0\% & \text{otherwise} \end{cases}$$
+   *(Ideal for zero-incident, zero-downtime, or zero-defect target scenarios)*
+
+
+### 📅 Check-in Schedule Enforcement
+The portal enforces strict quarterly windows for achievement capture to ensure operational compliance. Both frontend forms and backend REST endpoints enforce the following timeline checks:
+
+| Phase / Quarter | Month Range | Enforced Window Opens | Core Activities Enforced |
+| :--- | :--- | :--- | :--- |
+| **Phase 1: Goal Setting** | May - June | **1st May** | Drafting, Validation checks, & Manager Approvals |
+| **Q1 Check-in** | July - September | **1st July** | Planned vs. Actual progress logs & Check-in reviews |
+| **Q2 Check-in** | October - December | **1st October** | Planned vs. Actual progress logs & Check-in reviews |
+| **Q3 Check-in** | January - February | **1st January** | Planned vs. Actual progress logs & Check-in reviews |
+| **Q4 / Annual** | March - April | **1st March** | Final achievement capture, annual score compile |
+
+#### 🔑 Schedule Bypass & Demo Mode
+For continuous testing and demonstration purposes, the system incorporates a **Demo Override Mode**:
+* **Client-side Toggle**: Available in the Quarterly Check-In UI header to bypass calendar schedule validation checks.
+* **HTTP Header-based Enforcement**: Uses a custom `X-Bypass-Restrictions` header. If passed, the FastAPI backend allows recording logs outside of the standard fiscal dates.
 
 ---
 
@@ -109,6 +148,43 @@ This system enables a robust **Employee-Manager-HR Admin** relationship structur
     ```
 5.  Open your browser and navigate to `http://localhost:5173`.
 
+### 🔑 Demo & Testing Credentials
+For evaluators to easily log in and test each role without manual registration, use the following pre-seeded credentials:
+
+| Role | Email Address | Password | Department | Target Workspace View |
+| :--- | :--- | :--- | :--- | :--- |
+| **HR Admin** | `aashita@gmail.com` | `Password123` | *Global* | `/admin/dashboard` |
+| **Manager** | `aashi@gmail.com` | `Password123` | Sales | `/manager/dashboard` |
+| **Employee** | `bhavya@gmail.com` | `Password123` | Engineering | `/employee/dashboard` |
+
+> [NOTE]
+> * You can also create brand-new test accounts dynamically with any role (Employee, Manager, or Admin) using the **"Sign up"** page available at `http://localhost:5173/signup`.
+> * Newly registered Employees can be mapped to Managers and departments by accessing the HR Admin's **User & Hierarchy Management** screen.
+
+---
+
+
+## 🛡️ Reporting & Governance Deliverables
+
+The system incorporates robust regulatory compliance and governance tools matching audit-trail standards:
+
+
+1. **📊 Exportable Achievement Report (CSV/Excel)**:
+   * **Route**: `/api/admin/achievement-reports/export`
+   * **Payload details**: Generates a dynamically formatted, downloadable CSV record capturing Employee Name, Email, Reporting Manager, Department, Thrust Area, Goal Title, Description, UOM, Weight (%), Targets, actual logged values across all quarters (Q1–Q4), computed progress scores, and goal locked states.
+   * **Integration**: Accessed via a dedicated **"Export Achievement Reports (CSV)"** download widget on the HR Admin Reports & Governance Dashboard.
+   * **How to Download (Admin/HR User)**:
+     1. Log in to the platform with an authorized **HR Admin** account (e.g., email: `admin@company.com`, password: `Password123`).
+     2. In the Admin sidebar/navigation panel, click on **"Reports & Governance"** (or go to `http://localhost:5173/admin/reports`).
+     3. Scroll to the report options and locate the **"Export Achievement Reports (CSV)"** card.
+     4. Click the button; the system will query all employees' goal sheet targets and quarterly achievements, format the data, and stream the file `achievement_report.csv` directly to your browser's download folder.
+
+
+2. **📜 Secure Audit Trail System**:
+   * **Post-Lock Governance**: Automatically logs overrides when goals are locked or unlocked.
+   * **Information Captured**: Tracks Who (authorized HR Admin), What (Lock/Unlock sheet override), When (exact timestamp), and the previous vs. updated secure locking values.
+   * **Database Persistence**: Saved in the `GoalAuditLog` table and displayed on the Admin's **System Audit Trail Timeline** screen.
+
 ---
 
 ## 🗄️ Database Entity-Relationship Overview
@@ -119,4 +195,6 @@ This system enables a robust **Employee-Manager-HR Admin** relationship structur
 *   **`Goal`**: Individual employee objectives. Tracks fields like status (`Draft`, `Pending`, `Approved`, `Rejected`), `weight`, `target`, `uom` (numeric, %, timeline, zero-based), and links optionally to a `SharedKPI`.
 *   **`GoalTask`**: Granular, action items managed by the employee to track how goals are being executed.
 *   **`GoalCheckin`**: Periodic actual progress logged by employees, with corresponding feedback notes and check-in comments added by managers.
+*   **`GoalAuditLog`**: Persistent audit log of all changes made to goals after the manager locks them. Captures who made the edit (authorizing HR/Admin user), what changed (previous vs. new values and details of the action), and exactly when (UTC timestamp).
+
 
