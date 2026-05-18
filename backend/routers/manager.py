@@ -88,7 +88,8 @@ async def get_team_data(
             joinedload(User.goals).options(
                 joinedload(Goal.achievements),
                 joinedload(Goal.checkins),
-                joinedload(Goal.thrust_area)
+                joinedload(Goal.thrust_area),
+                joinedload(Goal.tasks)
             )
         )
     )
@@ -203,7 +204,8 @@ async def get_pending_team_goals(
             joinedload(Goal.owner), 
             joinedload(Goal.thrust_area),
             joinedload(Goal.achievements),
-            joinedload(Goal.checkins)
+            joinedload(Goal.checkins),
+            joinedload(Goal.tasks)
         )
     )
     return goals_result.unique().scalars().all()

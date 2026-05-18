@@ -53,6 +53,15 @@ class GoalCreate(BaseModel):
     year: int
     submit_now: bool = False
 
+class GoalUpdate(BaseModel):
+    thrust_area_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    uom: Optional[str] = None
+    target: Optional[Decimal] = None
+    weight: Optional[int] = None
+    year: Optional[int] = None
+
 class ManagerUpdate(BaseModel):
     manager_id: int
 

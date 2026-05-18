@@ -122,3 +122,24 @@ export const fetchLinkedEmployeeGoals = async (kpiId) => {
   if (!response.ok) throw new Error('Failed to fetch linked employee goals');
   return result;
 };
+
+export const updateGoal = async (goalId, data) => {
+  const { response, data: result } = await apiClient(`/goals/${goalId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    const error = new Error('Failed to update goal');
+    error.response = { data: result };
+    throw error;
+  }
+  return result;
+};
+
+export const deleteGoal = async (goalId) => {
+  const { response, data: result } = await apiClient(`/goals/${goalId}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Failed to delete goal');
+  return result;
+};

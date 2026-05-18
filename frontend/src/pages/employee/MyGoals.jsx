@@ -6,7 +6,9 @@ import {
   createTask,
   updateTask,
   deleteTask,
-  updatePersonalNotesWeight
+  updatePersonalNotesWeight,
+  updateGoal,
+  deleteGoal
 } from '../../api/goals';
 import { 
   Target, 
@@ -51,6 +53,14 @@ export default function MyGoals() {
   const [editableNotes, setEditableNotes] = useState({});
   const [savingSettingsId, setSavingSettingsId] = useState(null);
 
+  // Editable core fields for draft goals
+  const [editableTitles, setEditableTitles] = useState({});
+  const [editableDescriptions, setEditableDescriptions] = useState({});
+  const [editableUoms, setEditableUoms] = useState({});
+  const [editableTargets, setEditableTargets] = useState({});
+  const [editableThrustAreas, setEditableThrustAreas] = useState({});
+  const [submittingSheet, setSubmittingSheet] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -66,12 +76,29 @@ export default function MyGoals() {
       // Seed initial editable values
       const weights = {};
       const notes = {};
+      const titles = {};
+      const descriptions = {};
+      const uoms = {};
+      const targets = {};
+      const thrustAreas = {};
+
       data.forEach(g => {
         weights[g.id] = g.weight;
         notes[g.id] = g.personal_notes || '';
+        titles[g.id] = g.title;
+        descriptions[g.id] = g.description || '';
+        uoms[g.id] = g.uom;
+        targets[g.id] = g.target;
+        thrustAreas[g.id] = g.thrust_area_id || '';
       });
+
       setEditableWeights(weights);
       setEditableNotes(notes);
+      setEditableTitles(titles);
+      setEditableDescriptions(descriptions);
+      setEditableUoms(uoms);
+      setEditableTargets(targets);
+      setEditableThrustAreas(thrustAreas);
     } catch (err) {
       console.error('Failed to fetch goals:', err);
       setError('Failed to load goals. Please try again later.');
@@ -82,13 +109,14 @@ export default function MyGoals() {
 
   const handleSubmit = async (goalId) => {
     setProcessingId(goalId);
+    setError(null);
     try {
       await submitGoal(goalId);
-      setSuccessMessage('Goal submitted to manager for approval!');
+      setSuccessMessage('Goal sheet submitted to manager for approval!');
       
-      // Update local state
+      // Update local state: all drafts/rejected are now pending
       setGoals(prev => prev.map(g => {
-        if (g.id === goalId) {
+        if (g.status?.toLowerCase() === 'draft' || g.status?.toLowerCase() === 'rejected') {
           return { ...g, status: 'Pending' };
         }
         return g;
@@ -97,9 +125,36 @@ export default function MyGoals() {
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
       console.error('Failed to submit goal:', err);
-      alert('Failed to submit goal for approval.');
+      setError(err.response?.data?.detail || 'Failed to submit goal.');
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleSubmitSheet = async () => {
+    setError(null);
+    const draftAndRejected = pendingAndDraftGoals.filter(g => g.status?.toLowerCase() === 'draft' || g.status?.toLowerCase() === 'rejected');
+    if (draftAndRejected.length === 0) return;
+    
+    setSubmittingSheet(true);
+    try {
+      // We can submit using any of the draft goal IDs as our submit endpoint does sheet validation and processes all drafts
+      await submitGoal(draftAndRejected[0].id);
+      setSuccessMessage('Your entire goal sheet has been successfully submitted to your manager for approval!');
+      
+      setGoals(prev => prev.map(g => {
+        if (g.status?.toLowerCase() === 'draft' || g.status?.toLowerCase() === 'rejected') {
+          return { ...g, status: 'Pending' };
+        }
+        return g;
+      }));
+      
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err) {
+      console.error('Failed to submit goal sheet:', err);
+      setError(err.response?.data?.detail || 'Failed to submit goal sheet.');
+    } finally {
+      setSubmittingSheet(false);
     }
   };
 
@@ -194,9 +249,10 @@ export default function MyGoals() {
     }
   };
 
-  // --- Weight & Personal Notes Operations ---
+  // --- Weight & Personal Notes & Core settings Operations ---
   const handleSaveSettings = async (goalId) => {
     setError(null);
+    const goal = goals.find(g => g.id === goalId);
     const weight = parseInt(editableWeights[goalId]);
     const notes = editableNotes[goalId];
 
@@ -207,23 +263,79 @@ export default function MyGoals() {
 
     setSavingSettingsId(goalId);
     try {
-      await updatePersonalNotesWeight(goalId, { weight, personal_notes: notes });
+      const isDraftOrRejected = goal.status === 'Draft' || goal.status === 'Rejected';
       
-      // Update local state
-      setGoals(prev => prev.map(g => {
-        if (g.id === goalId) {
-          return { ...g, weight, personal_notes: notes };
+      if (isDraftOrRejected) {
+        // Enforce shared goal constraints check on client side
+        const isShared = !!goal.shared_kpi_id;
+        const updatePayload = {
+          weight: weight,
+        };
+        
+        if (!isShared) {
+          updatePayload.title = editableTitles[goalId];
+          updatePayload.description = editableDescriptions[goalId];
+          updatePayload.uom = editableUoms[goalId];
+          updatePayload.target = editableTargets[goalId];
+          if (editableThrustAreas[goalId]) {
+            updatePayload.thrust_area_id = parseInt(editableThrustAreas[goalId]);
+          }
         }
-        return g;
-      }));
 
-      setSuccessMessage('Weightage and personal notes saved successfully!');
+        const updatedGoal = await updateGoal(goalId, updatePayload);
+        await updatePersonalNotesWeight(goalId, { weight, personal_notes: notes });
+
+        // Update local state with all new values
+        setGoals(prev => prev.map(g => {
+          if (g.id === goalId) {
+            return { 
+              ...g, 
+              title: updatedGoal.title,
+              description: updatedGoal.description,
+              uom: updatedGoal.uom,
+              target: updatedGoal.target,
+              thrust_area_id: updatedGoal.thrust_area_id,
+              thrust_area: updatedGoal.thrust_area,
+              weight, 
+              personal_notes: notes 
+            };
+          }
+          return g;
+        }));
+      } else {
+        await updatePersonalNotesWeight(goalId, { weight, personal_notes: notes });
+        
+        // Update local state
+        setGoals(prev => prev.map(g => {
+          if (g.id === goalId) {
+            return { ...g, weight, personal_notes: notes };
+          }
+          return g;
+        }));
+      }
+
+      setSuccessMessage('Goal settings saved successfully!');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
       console.error('Error saving settings:', err);
-      setError(err.response?.data?.detail || 'Failed to update weightage and notes.');
+      setError(err.response?.data?.detail || 'Failed to update goal settings.');
     } finally {
       setSavingSettingsId(null);
+    }
+  };
+
+  const handleDeleteGoal = async (goalId) => {
+    if (!window.confirm("Are you sure you want to delete this draft goal?")) return;
+    
+    setError(null);
+    try {
+      await deleteGoal(goalId);
+      setSuccessMessage('Draft goal deleted successfully!');
+      setGoals(prev => prev.filter(g => g.id !== goalId));
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err) {
+      console.error('Failed to delete goal:', err);
+      setError('Failed to delete draft goal.');
     }
   };
 
@@ -256,6 +368,15 @@ export default function MyGoals() {
   }
 
   const displayedGoals = activeTab === 'active' ? activeGoals : pendingAndDraftGoals;
+
+  // Compliance calculations for drafts
+  const draftGoalsCount = pendingAndDraftGoals.length;
+  const draftTotalWeight = pendingAndDraftGoals.reduce((sum, g) => sum + g.weight, 0);
+  const minWeightValid = pendingAndDraftGoals.every(g => g.weight >= 10);
+  const maxGoalsValid = draftGoalsCount <= 8;
+  const sumWeightsValid = draftTotalWeight === 100;
+  const hasDrafts = pendingAndDraftGoals.some(g => g.status?.toLowerCase() === 'draft' || g.status?.toLowerCase() === 'rejected');
+  const isSheetValid = minWeightValid && maxGoalsValid && sumWeightsValid && draftGoalsCount > 0;
 
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-500">
@@ -315,6 +436,104 @@ export default function MyGoals() {
           <span>Drafts & Pending ({pendingAndDraftGoals.length})</span>
         </button>
       </nav>
+
+      {activeTab === 'drafts' && pendingAndDraftGoals.length > 0 && (
+        <div className="bg-surface rounded-3xl p-6 border border-white/20 shadow-[6px_6px_12px_#AEAEC0,-6px_-6px_12px_#FFFFFF] space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-lg font-black text-on-surface flex items-center gap-2">
+                <FileText className="text-primary" size={22} />
+                Goal Sheet Submission Guidelines
+              </h2>
+              <p className="text-secondary text-xs font-semibold mt-0.5">Enforce sheet compliance before final manager review.</p>
+            </div>
+            
+            {hasDrafts && (
+              <button 
+                disabled={!isSheetValid || submittingSheet}
+                onClick={handleSubmitSheet}
+                className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all text-sm ${
+                  isSheetValid 
+                    ? 'bg-primary text-on-primary hover:scale-[1.03] active:scale-95 cursor-pointer' 
+                    : 'bg-surface-dim text-secondary opacity-60 cursor-not-allowed border border-white/10'
+                }`}
+              >
+                {submittingSheet ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    <span>Submit Goal Sheet for Approval</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Validation Indicators */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {/* Rule 1: Sum = 100% */}
+            <div className={`p-4 rounded-2xl border transition-all flex items-start gap-3 bg-surface-dim/40 ${
+              sumWeightsValid ? 'border-emerald-500/20 text-emerald-600' : 'border-amber-500/20 text-amber-600'
+            }`}>
+              <div className={`mt-0.5 rounded-full p-0.5 ${sumWeightsValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                {sumWeightsValid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider block">Total Weightage Sum</span>
+                <p className="text-xs font-bold text-on-surface mt-1">Must equal exactly 100%</p>
+                <p className={`text-[10px] font-semibold mt-0.5 ${sumWeightsValid ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  Current total: {draftTotalWeight}%
+                </p>
+              </div>
+            </div>
+
+            {/* Rule 2: Count <= 8 */}
+            <div className={`p-4 rounded-2xl border transition-all flex items-start gap-3 bg-surface-dim/40 ${
+              maxGoalsValid ? 'border-emerald-500/20 text-emerald-600' : 'border-rose-500/20 text-rose-600'
+            }`}>
+              <div className={`mt-0.5 rounded-full p-0.5 ${maxGoalsValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                {maxGoalsValid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider block">Goal Density Count</span>
+                <p className="text-xs font-bold text-on-surface mt-1">Maximum of 8 goals allowed</p>
+                <p className={`text-[10px] font-semibold mt-0.5 ${maxGoalsValid ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  Current goals: {draftGoalsCount} / 8
+                </p>
+              </div>
+            </div>
+
+            {/* Rule 3: Min Weight >= 10% */}
+            <div className={`p-4 rounded-2xl border transition-all flex items-start gap-3 bg-surface-dim/40 ${
+              minWeightValid ? 'border-emerald-500/20 text-emerald-600' : 'border-rose-500/20 text-rose-600'
+            }`}>
+              <div className={`mt-0.5 rounded-full p-0.5 ${minWeightValid ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                {minWeightValid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider block">Individual Weight Min</span>
+                <p className="text-xs font-bold text-on-surface mt-1">Minimum weightage of 10%</p>
+                <p className={`text-[10px] font-semibold mt-0.5 ${minWeightValid ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {minWeightValid ? 'All goals satisfy rule' : 'Some goals fall under 10%'}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {!isSheetValid && hasDrafts && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 rounded-2xl flex items-center gap-2">
+              <AlertCircle className="shrink-0 text-amber-600" size={16} />
+              <span className="text-[10px] font-bold uppercase tracking-tight leading-snug">
+                Please refine draft values (Weights or Density) to satisfy the guidelines before submission becomes available.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {displayedGoals.length === 0 ? (
         /* Empty State */
@@ -419,14 +638,99 @@ export default function MyGoals() {
                 {/* Collapsed/Expanded Panel (Tasks & Personal Notes Weightage) */}
                 {isExpanded && (
                   <div className="p-8 bg-surface-dim/5 border-t border-surface-dim/40 grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-300">
-                    
-                    {/* Left Panel: Weightage & Personal Notes */}
+                                       {/* Left Panel: Weightage & Personal Notes & Core Fields Inline Editor */}
                     <div className="bg-surface p-6 rounded-2xl border border-white/20 shadow-sm space-y-6 flex flex-col justify-between">
                       <div className="space-y-4">
                         <h4 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2 border-b border-surface-dim pb-2">
                           <Settings size={16} className="text-primary" />
-                          <span>Goal Settings & Self Notes</span>
+                          <span>Goal Settings & Definition</span>
                         </h4>
+
+                        {/* Inline Core Fields for Draft/Rejected Goals */}
+                        {(goal.status === 'Draft' || goal.status === 'Rejected') && (
+                          <div className="space-y-4 bg-surface-dim/20 p-4 rounded-2xl border border-white/10">
+                            <span className="text-[10px] font-black text-primary uppercase tracking-[0.15em] block border-b border-surface-dim/40 pb-1">
+                              Inline Definition Editor
+                            </span>
+                            
+                            {isShared ? (
+                              <div className="p-3 bg-rose-500/5 border border-rose-500/10 text-rose-600 rounded-xl flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide">
+                                <Lock size={14} />
+                                <span>Pushed KPI definition is read-only</span>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Goal Title */}
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Goal Title</label>
+                                  <input 
+                                    type="text"
+                                    className="w-full bg-surface py-2 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface placeholder:text-secondary/40 focus:ring-1 focus:ring-primary"
+                                    value={editableTitles[goal.id] || ''}
+                                    onChange={(e) => setEditableTitles({ ...editableTitles, [goal.id]: e.target.value })}
+                                    placeholder="Enter goal title..."
+                                  />
+                                </div>
+
+                                {/* Goal Description */}
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Goal Description</label>
+                                  <textarea 
+                                    rows={2}
+                                    className="w-full bg-surface py-2 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface placeholder:text-secondary/40 focus:ring-1 focus:ring-primary"
+                                    value={editableDescriptions[goal.id] || ''}
+                                    onChange={(e) => setEditableDescriptions({ ...editableDescriptions, [goal.id]: e.target.value })}
+                                    placeholder="Describe strategy and key targets..."
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                  {/* Thrust Area */}
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Thrust Area</label>
+                                    <select 
+                                      className="w-full bg-surface py-2 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface focus:ring-1 focus:ring-primary appearance-none"
+                                      value={editableThrustAreas[goal.id] || ''}
+                                      onChange={(e) => setEditableThrustAreas({ ...editableThrustAreas, [goal.id]: e.target.value })}
+                                    >
+                                      <option value="">Select Thrust Area</option>
+                                      <option value="1">Sales & Revenue</option>
+                                      <option value="2">Product Innovation</option>
+                                      <option value="3">Customer Excellence</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Unit of Measurement */}
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">UoM</label>
+                                    <select 
+                                      className="w-full bg-surface py-2 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface focus:ring-1 focus:ring-primary appearance-none"
+                                      value={editableUoms[goal.id] || ''}
+                                      onChange={(e) => setEditableUoms({ ...editableUoms, [goal.id]: e.target.value })}
+                                    >
+                                      <option value="Min">Numeric (Higher is better)</option>
+                                      <option value="Max">Numeric (Lower is better)</option>
+                                      <option value="Timeline">Timeline (Date-based)</option>
+                                      <option value="Zero">Zero (Zero is success)</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {/* Target Value */}
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Planned Target</label>
+                                  <input 
+                                    type={editableUoms[goal.id] === 'Timeline' ? 'date' : 'number'}
+                                    className="w-full bg-surface py-2 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface focus:ring-1 focus:ring-primary"
+                                    value={editableTargets[goal.id] || ''}
+                                    onChange={(e) => setEditableTargets({ ...editableTargets, [goal.id]: e.target.value })}
+                                    placeholder="Enter target value..."
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {/* Adjust Weight */}
                         <div className="flex flex-col gap-1.5">
@@ -450,22 +754,34 @@ export default function MyGoals() {
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[9px] font-black text-secondary uppercase tracking-[0.15em]">Personal Evaluation Notes (HOW)</label>
                           <textarea 
-                            rows={4}
+                            rows={isShared ? 4 : 2}
                             placeholder="Add your execution plans, personal commitments, or notes here..."
-                            className="w-full bg-surface py-2.5 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface placeholder:text-secondary/40"
-                            value={editableNotes[goal.id]}
+                            className="w-full bg-surface py-2.5 px-3 rounded-xl border-none neumorphic-inset text-xs font-bold text-on-surface placeholder:text-secondary/40 focus:ring-1 focus:ring-primary"
+                            value={editableNotes[goal.id] || ''}
                             onChange={(e) => setEditableNotes({ ...editableNotes, [goal.id]: e.target.value })}
                           />
                         </div>
                       </div>
 
-                      <button 
-                        disabled={savingSettingsId === goal.id}
-                        onClick={() => handleSaveSettings(goal.id)}
-                        className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-black text-[10px] uppercase tracking-widest shadow hover:scale-[1.02] transition-all disabled:opacity-50 mt-4"
-                      >
-                        {savingSettingsId === goal.id ? 'Saving settings...' : 'Save Settings'}
-                      </button>
+                      <div className="flex flex-col gap-3 mt-4">
+                        <button 
+                          disabled={savingSettingsId === goal.id}
+                          onClick={() => handleSaveSettings(goal.id)}
+                          className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-black text-[10px] uppercase tracking-widest shadow hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {savingSettingsId === goal.id ? 'Saving settings...' : 'Save Settings'}
+                        </button>
+                        
+                        {(goal.status === 'Draft' || goal.status === 'Rejected') && (
+                          <button 
+                            onClick={() => handleDeleteGoal(goal.id)}
+                            className="w-full py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-95 transition-all"
+                          >
+                            <Trash2 size={12} />
+                            <span>Delete Draft Goal</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Right Panel: Employee-Owned Individual Tasks (HOW) */}

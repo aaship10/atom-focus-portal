@@ -39,9 +39,74 @@ const Skeleton = ({ className }) => (
 );
 
 // A. ManagerDashboard Component
-const ManagerDashboardView = ({ stats, pendingGoals, onNavigate }) => {
+const ManagerDashboardView = ({ stats, pendingGoals, teamData, onNavigate }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedMember, setExpandedMember] = useState(null);
+  const [activeSubTab, setActiveSubTab] = useState({}); // goalId -> subTab ('progress', 'tasks')
+
+  // Search filter
+  const filteredTeam = teamData.filter(member => 
+    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const calculateGoalProgress = (goal) => {
+    const achievements = goal.achievements || [];
+    if (achievements.length === 0) return 0;
+    
+    // Sort achievements by quarter order Q1 -> Q2 -> Q3 -> Q4
+    const quarterOrder = { 'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4 };
+    const sorted = [...achievements].sort((a, b) => {
+      const orderA = quarterOrder[a.quarter] || 0;
+      const orderB = quarterOrder[b.quarter] || 0;
+      if (orderA !== orderB) return orderB - orderA;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+    
+    const latest = sorted[0];
+    const actual = parseFloat(latest.actual_value);
+    const target = parseFloat(goal.target);
+    
+    if (isNaN(actual) || isNaN(target) || target === 0) return 0;
+    
+    if (goal.uom === 'Min') {
+      return Math.min(Math.round((actual / target) * 100), 100);
+    } else if (goal.uom === 'Max') {
+      if (actual === 0) return target > 0 ? 100 : 0;
+      return Math.min(Math.round((target / actual) * 100), 100);
+    } else if (goal.uom === 'Zero') {
+      return actual === 0 ? 100 : 0;
+    } else if (goal.uom === 'Timeline') {
+      return 100;
+    }
+    return 0;
+  };
+
+  const getOverallTeamMemberProgress = (member) => {
+    const activeGoals = member.goals.filter(g => 
+      g.status?.toLowerCase() === 'approved' || 
+      g.status?.toLowerCase() === 'on track' || 
+      g.status?.toLowerCase() === 'completed'
+    );
+    if (activeGoals.length === 0) return 0;
+    
+    const sumProgress = activeGoals.reduce((sum, g) => sum + calculateGoalProgress(g), 0);
+    return Math.round(sumProgress / activeGoals.length);
+  };
+
+  const getTotalGoalWeight = (member) => {
+    return member.goals.reduce((sum, g) => sum + (g.weight || 0), 0);
+  };
+
+  const getProgressColorClass = (progress) => {
+    if (progress >= 80) return 'bg-emerald-500';
+    if (progress >= 50) return 'bg-amber-500';
+    return 'bg-rose-500';
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
           title="Total Team Goals" 
@@ -63,30 +128,29 @@ const ManagerDashboardView = ({ stats, pendingGoals, onNavigate }) => {
         />
       </div>
 
-      <section className="bg-surface rounded-3xl shadow-card border border-white/20 overflow-hidden">
+      {/* Needs Attention Pending Reviews */}
+      <section className="bg-surface rounded-3xl shadow-card border border-white/20 overflow-hidden animate-in fade-in duration-300">
         <div className="p-6 border-b border-surface-dim flex items-center justify-between">
           <h3 className="text-xl font-black text-on-surface flex items-center gap-2">
             <AlertCircle className="text-error" size={20} />
             Needs Attention
           </h3>
           <button onClick={() => onNavigate('approvals')} className="text-sm font-bold text-primary hover:underline">
-            View All
+            View All Approvals
           </button>
         </div>
         <div className="divide-y divide-surface-dim">
           {pendingGoals.length === 0 ? (
             <div className="p-12 text-center text-secondary">
               <CheckCircle size={48} className="mx-auto opacity-20 mb-4" />
-              <p className="font-medium italic">Everything looks good! No goals need immediate attention.</p>
+              <p className="font-medium italic">Everything looks good! No goals need immediate review.</p>
             </div>
           ) : (
-            pendingGoals.map((goal) => (
+            pendingGoals.slice(0, 3).map((goal) => (
               <div key={goal.id} className="p-6 flex flex-col md:flex-row md:items-center gap-6 group hover:bg-surface-variant transition-all">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                      goal.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-error/10 text-error'
-                    }`}>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-700 border border-amber-500/20 shadow-sm">
                       {goal.status}
                     </span>
                     <h4 className="font-bold text-on-surface">{goal.title}</h4>
@@ -99,10 +163,289 @@ const ManagerDashboardView = ({ stats, pendingGoals, onNavigate }) => {
                   onClick={() => onNavigate('approvals')}
                   className="flex items-center gap-2 text-primary font-bold text-sm hover:translate-x-1 transition-transform"
                 >
-                  Action <ChevronDown className="-rotate-90" size={16} />
+                  Go to Approvals <ChevronDown className="-rotate-90" size={16} />
                 </button>
               </div>
             ))
+          )}
+        </div>
+      </section>
+
+      {/* Team Performance Overview Roster */}
+      <section className="bg-surface rounded-3xl shadow-card border border-white/20 overflow-hidden">
+        <div className="p-6 border-b border-surface-dim flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-on-surface flex items-center gap-2">
+              <Users className="text-primary" size={22} />
+              Team Performance & Progress Overview
+            </h3>
+            <p className="text-secondary text-xs mt-1">Monitor direct reports, check weightage constraints, and review planned vs. achievement data.</p>
+          </div>
+          
+          {/* Search Box */}
+          <div className="relative shrink-0 max-w-xs w-full sm:w-64">
+            <input 
+              type="text" 
+              placeholder="Search team member..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface-variant/50 px-4 py-2.5 pl-10 rounded-xl border border-white/10 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
+            />
+            <svg 
+              className="absolute left-3 top-3.5 h-3.5 w-3.5 text-secondary" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="divide-y divide-surface-dim">
+          {filteredTeam.length === 0 ? (
+            <div className="p-12 text-center text-secondary italic">
+              No team members found matching "{searchTerm}"
+            </div>
+          ) : (
+            filteredTeam.map((member) => {
+              const totalWeight = getTotalGoalWeight(member);
+              const overallProgress = getOverallTeamMemberProgress(member);
+              const approvedGoals = member.goals.filter(g => 
+                g.status?.toLowerCase() === 'approved' || 
+                g.status?.toLowerCase() === 'on track' || 
+                g.status?.toLowerCase() === 'completed'
+              );
+              const isExpanded = expandedMember === member.id;
+
+              return (
+                <div key={member.id} className="transition-all">
+                  {/* Roster Row */}
+                  <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-variant/30 transition-colors">
+                    {/* User profile */}
+                    <div className="flex items-center gap-4 min-w-[240px]">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg shadow-sm border border-primary/5">
+                        {member.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-on-surface text-base leading-tight">{member.name}</h4>
+                        <span className="text-xs text-secondary font-medium leading-none block mt-1">{member.email}</span>
+                      </div>
+                    </div>
+
+                    {/* Goal Counts & Guidelines constraints (Weightage 100%) */}
+                    <div className="flex items-center gap-6 flex-wrap">
+                      <div className="text-center min-w-[80px]">
+                        <span className="text-xs font-black text-on-surface block">
+                          {approvedGoals.length} / {member.goals.length}
+                        </span>
+                        <span className="block text-[8px] text-secondary font-bold uppercase tracking-widest mt-1">Approved Goals</span>
+                      </div>
+                      
+                      <div className="text-center min-w-[100px]">
+                        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full inline-block ${
+                          totalWeight === 100 
+                            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                            : 'bg-rose-500/10 text-rose-600 border border-rose-500/20 animate-pulse'
+                        }`}>
+                          {totalWeight}%
+                        </span>
+                        <span className="block text-[8px] text-secondary font-bold uppercase tracking-widest mt-1">Total Weight</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar & Review Button */}
+                    <div className="flex items-center gap-6 justify-between md:justify-end flex-grow">
+                      <div className="flex flex-col gap-1.5 w-full max-w-[160px]">
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="font-bold text-secondary uppercase tracking-wider">Overall Progress</span>
+                          <span className="font-black text-on-surface">{overallProgress}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-surface-dim rounded-full overflow-hidden shadow-inner border border-white/5">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${getProgressColorClass(overallProgress)}`}
+                            style={{ width: `${overallProgress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setExpandedMember(isExpanded ? null : member.id)}
+                        className={`px-5 py-2.5 rounded-xl text-xs font-black shadow transition-all flex items-center gap-2 ${
+                          isExpanded 
+                            ? 'bg-surface-dim text-secondary shadow-inset' 
+                            : 'bg-primary text-on-primary hover:scale-105 active:scale-95'
+                        }`}
+                      >
+                        <span>{isExpanded ? 'Collapse' : 'Review Progress'}</span>
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Performance & Progress Review Panel */}
+                  {isExpanded && (
+                    <div className="p-8 bg-surface-dim/20 border-t border-surface-dim/40 animate-in slide-in-from-top-4 duration-300 space-y-6">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-surface-dim/60 pb-4 gap-4">
+                        <div>
+                          <h4 className="text-lg font-black text-on-surface">Planned vs. Achievement Performance Review</h4>
+                          <p className="text-secondary text-xs mt-0.5">Comparing structured objectives against logged real-world accomplishments for {member.name}.</p>
+                        </div>
+                        {totalWeight !== 100 && (
+                          <div className="bg-rose-500/10 text-rose-600 border border-rose-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold shadow-sm">
+                            <AlertCircle size={16} />
+                            <span>Total goal weightage must sum exactly to 100% per system governance.</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {member.goals.length === 0 ? (
+                        <div className="p-8 text-center text-secondary italic text-sm">
+                          No performance goals defined for this cycle.
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {member.goals.map((goal) => {
+                            const progress = calculateGoalProgress(goal);
+                            const currentSubTab = activeSubTab[goal.id] || 'progress';
+
+                            const setSubTab = (tab) => {
+                              setActiveSubTab(prev => ({ ...prev, [goal.id]: tab }));
+                            };
+
+                            return (
+                              <div 
+                                key={goal.id} 
+                                className="bg-surface rounded-2xl border border-white/20 p-6 shadow-sm flex flex-col lg:flex-row gap-6 transition-all"
+                              >
+                                {/* Left Section: Goal title & definition */}
+                                <div className="lg:w-1/3 space-y-3">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[9px] font-black text-primary uppercase tracking-wider">
+                                      {goal.thrust_area?.name || 'Department KPI'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${
+                                      goal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                                      goal.status === 'Off Track' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
+                                      'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                    }`}>
+                                      {goal.status}
+                                    </span>
+                                  </div>
+                                  <h5 className="font-bold text-on-surface text-base leading-snug">{goal.title}</h5>
+                                  <p className="text-secondary text-xs leading-relaxed">{goal.description}</p>
+                                  
+                                  <div className="flex gap-4 pt-2">
+                                    <div className="px-3 py-1.5 bg-surface-dim/40 rounded-xl border border-white/10 text-center leading-none">
+                                      <span className="text-xs font-black text-primary">{goal.weight}%</span>
+                                      <span className="block text-[7px] text-secondary font-bold uppercase mt-1">Weight</span>
+                                    </div>
+                                    <div className="px-3 py-1.5 bg-surface-dim/40 rounded-xl border border-white/10 text-center leading-none">
+                                      <span className="text-xs font-black text-on-surface">{goal.target}</span>
+                                      <span className="block text-[7px] text-secondary font-bold uppercase mt-1">Target ({goal.uom})</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Right Section: Tabs and performance details */}
+                                <div className="lg:w-2/3 flex flex-col border-t lg:border-t-0 lg:border-l border-surface-dim/40 pt-4 lg:pt-0 lg:pl-6">
+                                  {/* Tab selection */}
+                                  <div className="flex gap-2 p-1 bg-surface-dim rounded-xl border border-white/5 w-fit mb-4">
+                                    <button 
+                                      onClick={() => setSubTab('progress')}
+                                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                                        currentSubTab === 'progress' ? 'bg-surface shadow text-primary' : 'text-secondary hover:text-primary'
+                                      }`}
+                                    >
+                                      Planned vs Achievement
+                                    </button>
+                                    <button 
+                                      onClick={() => setSubTab('tasks')}
+                                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                                        currentSubTab === 'tasks' ? 'bg-surface shadow text-primary' : 'text-secondary hover:text-primary'
+                                      }`}
+                                    >
+                                      Action Items ({goal.tasks?.length || 0})
+                                    </button>
+                                  </div>
+
+                                  {/* Tab Contents */}
+                                  {currentSubTab === 'progress' && (
+                                    <div className="space-y-4 flex-grow flex flex-col justify-between">
+                                      {/* Planned vs Achievement Timeline */}
+                                      <div>
+                                        <label className="text-[9px] font-black text-secondary uppercase tracking-widest block mb-2">Logged Quarterly Achievements</label>
+                                        <div className="grid grid-cols-4 gap-3">
+                                          {['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
+                                            const ach = goal.achievements?.find(a => a.quarter === q);
+                                            return (
+                                              <div key={q} className="bg-surface-dim/35 p-3 rounded-xl border border-white/10 text-center flex flex-col justify-between h-16 leading-none shadow-sm">
+                                                <span className="text-[8px] font-bold text-secondary uppercase tracking-wider">{q}</span>
+                                                <span className="text-xs font-black text-on-surface mt-1 truncate">
+                                                  {ach ? ach.actual_value : '—'}
+                                                </span>
+                                                {ach && (
+                                                  <span className="text-[7px] text-emerald-600 font-bold block mt-1">Logged</span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* Goal Progress bar */}
+                                      <div className="space-y-1.5 pt-4 border-t border-surface-dim/40">
+                                        <div className="flex justify-between text-[10px] font-bold">
+                                          <span className="text-secondary uppercase tracking-wider">Goal Achievement Score</span>
+                                          <span className="text-primary">{progress}%</span>
+                                        </div>
+                                        <div className="w-full h-2 bg-surface-dim rounded-full overflow-hidden shadow-inner">
+                                          <div 
+                                            className={`h-full rounded-full transition-all duration-300 ${getProgressColorClass(progress)}`}
+                                            style={{ width: `${progress}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {currentSubTab === 'tasks' && (
+                                    <div className="flex-grow space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                                      <label className="text-[9px] font-black text-secondary uppercase tracking-widest block">Individual Execution Roadmap (HOW)</label>
+                                      {goal.tasks && goal.tasks.length > 0 ? (
+                                        goal.tasks.map(task => (
+                                          <div key={task.id} className="p-3 bg-surface-dim/40 rounded-xl border border-white/10 shadow-sm flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                                task.status === 'Completed' ? 'bg-emerald-500' : 'bg-amber-500'
+                                              }`} />
+                                              <span className={`text-xs font-bold text-on-surface ${task.status === 'Completed' ? 'line-through text-secondary/60' : ''}`}>
+                                                {task.title}
+                                              </span>
+                                            </div>
+                                            <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                              {task.progress}%
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-center py-6 text-secondary/60 italic text-xs">
+                                          No individual action items defined by employee.
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </section>
@@ -631,6 +974,7 @@ export default function ManagerExperience({ defaultTab = 'dashboard' }) {
           <ManagerDashboardView 
             stats={stats} 
             pendingGoals={pendingGoals} 
+            teamData={teamData}
             onNavigate={(tab) => {
               if (tab === 'approvals') navigate('/manager/approvals');
               else if (tab === 'checkins') navigate('/manager/check-ins');

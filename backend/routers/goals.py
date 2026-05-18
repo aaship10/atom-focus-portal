@@ -6,8 +6,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from typing import List, Optional
 from database import get_db
-from models import Goal, GoalAchievement, ThrustArea
-from schemas import GoalCreate, GoalResponse, GoalAchievementCreate, ThrustAreaSchema
+from models import Goal, GoalAchievement, ThrustArea, User
+from schemas import GoalCreate, GoalResponse, GoalAchievementCreate, ThrustAreaSchema, GoalUpdate
 from security import get_current_user
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
@@ -18,6 +18,21 @@ async def create_goal(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    # Enforce limit of 8 goals per employee per year
+    from sqlalchemy import func
+    count_result = await db.execute(
+        select(func.count(Goal.id)).where(
+            Goal.owner_id == goal_in.owner_id,
+            Goal.year == goal_in.year
+        )
+    )
+    existing_count = count_result.scalar() or 0
+    if existing_count >= 8:
+        raise HTTPException(
+            status_code=400,
+            detail="An employee can create a maximum of 8 goals. You have already reached this limit."
+        )
+
     # Basic Validation: Ensure weight is reasonable
     if goal_in.weight < 10 or goal_in.weight > 100:
         raise HTTPException(status_code=400, detail="Weight must be between 10 and 100")
@@ -123,8 +138,8 @@ async def log_achievement(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    if goal.locked and not goal.shared_kpi_id: # Allowed for shared KPI achievement sync
-        raise HTTPException(status_code=403, detail="Goal is locked for the current period")
+    # Goal locking check removed here so employees can log achievements on approved/locked goals.
+    # The quarterly window checks above will continue to restrict out-of-schedule logging.
 
     # Check for existing achievement for this quarter (Upsert Logic)
     existing_achievement = next((a for a in goal.achievements if a.quarter == achievement_in.quarter), None)
@@ -150,6 +165,36 @@ async def log_achievement(
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+async def validate_goals_for_submission(owner_id: int, year: int, db: AsyncSession):
+    # Fetch all goals of this employee for the current year
+    result = await db.execute(
+        select(Goal).where(Goal.owner_id == owner_id, Goal.year == year)
+    )
+    goals = result.scalars().all()
+    
+    if not goals:
+        raise HTTPException(status_code=400, detail="You do not have any goals to submit.")
+        
+    if len(goals) > 8:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You can create a maximum of 8 goals. Current count: {len(goals)}."
+        )
+        
+    total_weight = sum(g.weight for g in goals)
+    if total_weight != 100:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Total weightage across all goals must equal exactly 100%. Current total: {total_weight}%."
+        )
+        
+    for g in goals:
+        if g.weight < 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"The minimum weightage allowed for any individual goal is 10%. Goal '{g.title}' has {g.weight}%."
+            )
+
 @router.put("/{goal_id}/submit")
 async def submit_goal(
     goal_id: int,
@@ -163,12 +208,121 @@ async def submit_goal(
     
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found or unauthorized")
+        
+    # Enforce sheet-level validation rules before permitting submission of any goal!
+    await validate_goals_for_submission(current_user["id"], goal.year, db)
     
-    goal.status = 'Pending'
-    
+    # If the sheet is valid, we submit all draft/rejected goals on the sheet to ensure consistency
+    all_drafts_res = await db.execute(
+        select(Goal).where(
+            Goal.owner_id == current_user["id"],
+            Goal.year == goal.year,
+            Goal.status.in_(["Draft", "Rejected"])
+        )
+    )
+    all_drafts = all_drafts_res.scalars().all()
+    for g in all_drafts:
+        g.status = 'Pending'
+        
     try:
         await db.commit()
-        return {"success": True, "message": "Goal submitted for approval"}
+        return {"success": True, "message": "Goal sheet successfully submitted for approval"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{goal_id}", response_model=GoalResponse)
+async def update_goal(
+    goal_id: int,
+    goal_in: GoalUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Goal)
+        .where(Goal.id == goal_id)
+        .options(
+            joinedload(Goal.thrust_area), 
+            joinedload(Goal.achievements), 
+            joinedload(Goal.checkins),
+            joinedload(Goal.shared_kpi),
+            joinedload(Goal.tasks)
+        )
+    )
+    goal = result.unique().scalar_one_or_none()
+    
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can edit this goal.")
+        
+    if goal.locked:
+        raise HTTPException(status_code=403, detail="Goal is locked and cannot be edited without Admin intervention.")
+
+    # Shared goal constraints check:
+    if goal.shared_kpi_id:
+        # Check if they are trying to modify title, target, uom, or thrust_area_id
+        if (goal_in.title is not None and goal_in.title != goal.title) or \
+           (goal_in.target is not None and goal_in.target != goal.target) or \
+           (goal_in.uom is not None and goal_in.uom != goal.uom) or \
+           (goal_in.thrust_area_id is not None and goal_in.thrust_area_id != goal.thrust_area_id) or \
+           (goal_in.description is not None and goal_in.description != goal.description):
+            raise HTTPException(
+                status_code=403,
+                detail="For shared goals, title, target, UoM, and thrust area are read-only and cannot be changed."
+            )
+
+    # Basic validations
+    if goal_in.weight is not None:
+        if goal_in.weight < 10 or goal_in.weight > 100:
+            raise HTTPException(status_code=400, detail="Weight must be between 10% and 100%")
+        goal.weight = goal_in.weight
+
+    if goal_in.thrust_area_id is not None:
+        goal.thrust_area_id = goal_in.thrust_area_id
+    if goal_in.title is not None:
+        goal.title = goal_in.title
+    if goal_in.description is not None:
+        goal.description = goal_in.description
+    if goal_in.uom is not None:
+        goal.uom = goal_in.uom
+    if goal_in.target is not None:
+        goal.target = goal_in.target
+    if goal_in.year is not None:
+        goal.year = goal_in.year
+
+    try:
+        await db.commit()
+        await db.refresh(goal)
+        return goal
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{goal_id}")
+async def delete_goal(
+    goal_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    goal = await db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    if goal.owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the goal owner can delete this goal.")
+        
+    if goal.locked:
+        raise HTTPException(status_code=403, detail="Locked goals cannot be deleted.")
+        
+    if goal.status not in ["Draft", "Rejected"]:
+        raise HTTPException(status_code=403, detail="Only draft or rejected goals can be deleted.")
+        
+    try:
+        await db.delete(goal)
+        await db.commit()
+        return {"success": True, "message": "Goal deleted successfully"}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -311,6 +465,9 @@ async def update_personal_notes_weight(
         raise HTTPException(status_code=404, detail="Goal not found")
     if goal.owner_id != current_user["id"]:
         raise HTTPException(status_code=403, detail="Only the goal owner can update their weightage and personal notes.")
+
+    if goal.locked and goal.weight != payload.weight:
+        raise HTTPException(status_code=403, detail="Goal weightage is locked and cannot be edited without Admin intervention.")
 
     if payload.weight < 10 or payload.weight > 100:
         raise HTTPException(status_code=400, detail="Weight must be between 10% and 100%")
