@@ -70,21 +70,37 @@ For continuous testing and demonstration purposes, the system incorporates a **D
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 🛠️ System Architecture & Hosting Blueprint
 
-### Backend (Python)
-*   **Framework**: FastAPI for fast, asynchronous endpoints.
-*   **ORM**: SQLAlchemy 2.0 (with async capabilities).
-*   **Database**: PostgreSQL (via `asyncpg`) or SQLite for light, local development.
-*   **Security & Auth**: JWT-token based security (via `python-jose` and `passlib[bcrypt]`).
-*   **Validation**: Pydantic v2 schemas and validation settings.
+We have documented the system architecture with a highly-detailed visual blueprint available directly in the repository root:
+* 🖼️ **High-Resolution Raster (PNG)**: [architecture_diagram.png](./architecture_diagram.png) (Standard high-res image format)
 
-### Frontend (JavaScript/React)
-*   **Scaffolding**: Vite 8 (Hot Module Replacement, fast bundle builds).
-*   **Library**: React 19.
-*   **Styling**: Modern, elegant, curated color palettes, tailored glassmorphism, dynamic micro-animations, and custom neumorphic layout shadows.
-*   **Routing**: React Router DOM v7.
-*   **Icons**: Lucide React.
+### 🚀 Technology & Hosting Rationale
+
+#### 1. Frontend Tier (React 19 & Vite 8) — Hosted on **Vercel**
+* **Hosting Choice**: **Vercel**
+* **Rationale**: Optimized for single-page React applications. Vercel provides a global Edge CDN, ensuring ultra-low latency page loads, automated SSL termination, and seamless instant previews via continuous Git integration.
+* **Core Tech**:
+  * **React 19**: High-performance rendering model, state management, and modern concurrent capabilities.
+  * **Vite 8**: Next-gen development server supporting lightning-fast HMR (Hot Module Replacement) and optimized production compilation.
+  * **Tailwind CSS**: Modern utility styling tailored with elegant glassmorphism, dynamic micro-animations, and custom neumorphic layout shadows.
+  * **React Router DOM v7 & Lucide React**: Clean client-side page routing and beautiful modern iconography.
+
+#### 2. Backend Tier (FastAPI) — Hosted on **Render**
+* **Hosting Choice**: **Render Web Services**
+* **Rationale**: FastAPI runs best inside persistent server environments (rather than serverless functions) to preserve the asyncio event-loop state, maintain warm connections to database pools, and run concurrent background processes. Render provides dedicated, managed Web Services with Git-driven deployment and native SSL.
+* **Core Tech**:
+  * **FastAPI**: Industry-leading asynchronous web framework providing ultra-fast request routing, type safety, and automated OpenAPI documentation.
+  * **SQLAlchemy 2.0**: Modern Python ORM utilizing type-safe, asynchronous session capabilities.
+  * **Pydantic v2**: High-speed, Rust-backed validation library guaranteeing strict schemas.
+  * **python-jose & passlib**: Secure JWT state-free token issuance/verification and bcrypt password hashing.
+
+#### 3. Database Tier (PostgreSQL) — Hosted on **Supabase**
+* **Hosting Choice**: **Supabase**
+* **Rationale**: Enterprise goal setting requires rigid schema structure, transactional guarantees (ACID compliance), and complex self-referential reporting hierarchies (employee-manager mapping). A managed PostgreSQL instance on Supabase handles this natively, utilizing **PgBouncer** connection pooling to seamlessly support high numbers of concurrent async database connections without overloading resources.
+* **Core Tech**:
+  * **PostgreSQL 15**: Secure, highly available relational engine.
+  * **asyncpg**: Extremely fast, asynchronous PostgreSQL database driver for Python.
 
 ---
 
